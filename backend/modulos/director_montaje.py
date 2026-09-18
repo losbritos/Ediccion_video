@@ -17,9 +17,15 @@ from modulos.analizador_audio import (
 )
 from modulos.analizador_video import (
     analizar_movimiento_video,
-    calcular_puntuacion_atencion
+    calcular_puntuacion_atencion,
+    agrupar_momentos_cumbre
 )
-from modulos.motor_edicion import cortar_y_unir_segmentos
+from modulos.motor_edicion import (
+    cortar_y_unir_segmentos,
+    renderizar_short_con_subtitulos
+)
+from modulos.generador_subtitulos import generar_subtitulos_ass_animados
+from modulos.transcriptor_ia import TranscriptorLocal
 from modulos.gestor_plantillas import GestorPlantillas
 
 
@@ -179,3 +185,200 @@ class DirectorMontaje:
         finally:
             if Path(ruta_audio_temp).exists():
                 Path(ruta_audio_temp).unlink()
+
+    def procesar_generacion_shorts(
+        self,
+        ruta_video_entrada: str,
+        directorio_salida: str,
+        id_plantilla: str = "shooters_highlights",
+        cantidad_shorts: int = 3,
+        duracion_short_segundos: float = 35.0,
+        formato_vertical: bool = True,
+        incluir_subtitulos: bool = True,
+        ajustes_personalizados: Optional[Dict[str, Any]] = None,
+        callback_progreso: Optional[Callable[[int, str, str], None]] = None
+    ) -> Dict[str, Any]:
+        """
+        Analiza el video completo de partida larga, localiza los momentos cumbre con mayor impacto
+        (gritos/emoción + acción visual), y genera múltiples Shorts independientes con subtítulos
+        incrustados por Whisper y opción de encuadre vertical 9:16.
+
+        Args:
+            ruta_video_entrada: Video fuente largo (ej. partida de 20-40 min).
+            directorio_salida: Carpeta donde se guardarán los archivos MP4 de cada Short.
+            id_plantilla: Perfil de juego ('shooters_highlights', etc.).
+            cantidad_shorts: Cantidad de clips independientes a producir (ej. 3 a 5).
+            duracion_short_segundos: Duración aproximada de cada short (ej. 30 a 50s).
+            formato_vertical: True para exportar en lienzo 9:16 con fondo blur para TikTok/Shorts.
+            incluir_subtitulos: Si es True, transcribe con Faster-Whisper e incrusta subtítulos.
+            ajustes_personalizados: Parámetros opcionales para afinar umbrales.
+            callback_progreso: Función (porcentaje, etapa, mensaje) para actualizar estado en vivo.
+
+        Returns:
+            Diccionario estructurado con la lista de shorts producidos y sus metadatos.
+        """
+        def reportar(pct: int, etapa: str, msg: str) -> None:
+            if callback_progreso:
+                callback_progreso(pct, etapa, msg)
+
+        dir_salida = Path(directorio_salida)
+        dir_salida.mkdir(parents=True, exist_ok=True)
+
+        plantilla = self.gestor_plantillas.obtener_plantilla(id_plantilla)
+        if ajustes_personalizados:
+            plantilla = {**plantilla, **ajustes_personalizados}
+
+        reportar(5, "inicio", f"Iniciando escaneo del metraje completo para extraer {cantidad_shorts} Shorts destacados...")
+
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_wav:
+            ruta_audio_temp = temp_wav.name
+
+        archivos_temporales: List[Path] = [Path(ruta_audio_temp)]
+
+        try:
+            # 1. Extracción y análisis de audio del metraje completo
+            reportar(12, "audio", "Extrayendo audio para detección de jugadas y picos de voz...")
+            extraer_pista_audio(ruta_video_entrada, ruta_audio_temp)
+
+            tasa_muestreo, datos_audio = wavfile.read(ruta_audio_temp)
+            duracion_total = len(datos_audio) / tasa_muestreo
+
+            reportar(22, "audio", "Calculando decibelios y detectando momentos de gritos/reacción...")
+            picos_audio = detectar_picos_energia(ruta_audio_temp)
+
+            # 2. Análisis visual de movimiento con OpenCV
+            reportar(35, "vision", "Muestreando fotogramas con OpenCV para medir intensidad visual...")
+            muestras_movimiento = analizar_movimiento_video(ruta_video_entrada, fps_muestreo=2.5)
+
+            # 3. Puntuación de Atención y selección de los mejores momentos no solapados
+            reportar(48, "montaje", "Calculando 'Puntuación de Atención' y seleccionando los momentos cumbre...")
+            bloques_atencion = calcular_puntuacion_atencion(
+                muestras_movimiento=muestras_movimiento,
+                picos_audio=picos_audio,
+                duracion_total=duracion_total
+            )
+
+            momentos_cumbre = agrupar_momentos_cumbre(
+                bloques_atencion=bloques_atencion,
+                duracion_total=duracion_total,
+                cantidad_shorts=cantidad_shorts,
+                duracion_short_segundos=duracion_short_segundos,
+                distancia_minima_segundos=max(30.0, duracion_short_segundos * 1.2)
+            )
+
+            if not momentos_cumbre:
+                raise RuntimeError("No se detectaron momentos suficientes en el metraje analizado.")
+
+            reportar(55, "montaje", f"Se seleccionaron {len(momentos_cumbre)} momentos cumbre para generar Shorts.")
+
+            # 4. Transcripción con Faster-Whisper e incrustación de subtítulos por cada Short
+            transcriptor = None
+            if incluir_subtitulos:
+                try:
+                    reportar(58, "whisper", "Inicializando motor de Inteligencia Artificial Faster-Whisper...")
+                    transcriptor = TranscriptorLocal(tamano_modelo="base")
+                except Exception as error_ia:
+                    reportar(59, "whisper", f"Aviso: Transcripción IA no disponible ({error_ia}). Renderizando sin subtítulos.")
+                    transcriptor = None
+
+            shorts_generados: List[Dict[str, Any]] = []
+            total_momentos = len(momentos_cumbre)
+
+            for idx, momento in enumerate(momentos_cumbre, start=1):
+                inicio_corte = momento["inicio"]
+                duracion_corte = momento["duracion"]
+                fin_corte = momento["fin"]
+
+                porcentaje_base = 60 + int((idx - 1) / total_momentos * 35)
+                reportar(
+                    porcentaje_base,
+                    "render",
+                    f"Procesando Short #{idx} de {total_momentos} (Minuto {int(inicio_corte // 60):02d}:{int(inicio_corte % 60):02d})..."
+                )
+
+                ruta_ass_short = None
+
+                # Si los subtítulos están habilitados, transcribir el audio específico de este clip
+                if transcriptor is not None:
+                    reportar(
+                        porcentaje_base + 2,
+                        "whisper",
+                        f"Transcribiendo diálogo y generando subtítulos animados para Short #{idx}..."
+                    )
+                    # Cortar el audio en memoria directamente
+                    indice_muestra_inicio = int(inicio_corte * tasa_muestreo)
+                    indice_muestra_fin = int(fin_corte * tasa_muestreo)
+                    trozo_audio = datos_audio[indice_muestra_inicio:indice_muestra_fin]
+
+                    ruta_audio_trozo = dir_salida / f"temp_audio_short_{idx}.wav"
+                    archivos_temporales.append(ruta_audio_trozo)
+                    wavfile.write(str(ruta_audio_trozo), tasa_muestreo, trozo_audio)
+
+                    try:
+                        segmentos_texto = transcriptor.transcribir_audio(
+                            str(ruta_audio_trozo),
+                            idioma="es",
+                            con_marcas_palabra=True
+                        )
+                        ruta_ass = dir_salida / f"subtitulos_short_{idx}.ass"
+                        archivos_temporales.append(ruta_ass)
+
+                        generar_subtitulos_ass_animados(
+                            segmentos_transcripcion=segmentos_texto,
+                            ruta_salida_ass=str(ruta_ass),
+                            color_primario_hex="#FFEA00",
+                            color_borde_hex="#000000",
+                            formato_vertical=formato_vertical
+                        )
+                        ruta_ass_short = str(ruta_ass)
+                    except Exception as error_sub:
+                        reportar(porcentaje_base + 3, "whisper", f"Aviso al transcribir Short #{idx}: {error_sub}")
+                        ruta_ass_short = None
+
+                # Renderizar el archivo final de este short
+                nombre_archivo_short = f"short_{idx}_min_{int(inicio_corte // 60):02d}_{int(inicio_corte % 60):02d}.mp4"
+                ruta_mp4_short = dir_salida / nombre_archivo_short
+
+                renderizar_short_con_subtitulos(
+                    ruta_video_origen=ruta_video_entrada,
+                    tiempo_inicio=inicio_corte,
+                    duracion=duracion_corte,
+                    ruta_salida=str(ruta_mp4_short),
+                    ruta_subtitulos_ass=ruta_ass_short,
+                    formato_vertical=formato_vertical
+                )
+
+                minutos = int(inicio_corte // 60)
+                segs = int(inicio_corte % 60)
+
+                shorts_generados.append({
+                    "indice": idx,
+                    "nombre_archivo": nombre_archivo_short,
+                    "ruta_archivo": str(ruta_mp4_short.resolve()),
+                    "inicio": inicio_corte,
+                    "fin": fin_corte,
+                    "duracion": duracion_corte,
+                    "puntuacion_atencion": momento["puntuacion_atencion"],
+                    "tiempo_formateado": f"{minutos:02d}:{segs:02d}",
+                    "descripcion": momento["descripcion"],
+                    "formato": "9:16 Vertical" if formato_vertical else "16:9 Panorámico"
+                })
+
+            reportar(100, "completado", f"¡Completado! Se generaron {len(shorts_generados)} Shorts destacados con subtítulos.")
+
+            return {
+                "modo": "shorts",
+                "duracion_original": round(duracion_total, 2),
+                "cantidad_shorts": len(shorts_generados),
+                "formato_vertical": formato_vertical,
+                "shorts": shorts_generados
+            }
+
+        finally:
+            # Limpieza exhaustiva de archivos temporales
+            for temp_f in archivos_temporales:
+                if temp_f.exists():
+                    try:
+                        temp_f.unlink()
+                    except Exception:
+                        pass

@@ -95,16 +95,19 @@ export function subirVideoLocal(archivoVideo, callbackProgresoSubida) {
 
 /**
  * Inicia la tarea de edición automática con los parámetros configurados.
- * @param {string} idVideo - Identificador del video cargado.
- * @param {string} idPlantilla - Identificador de la plantilla seleccionada.
- * @param {object} opcionesAvanzadas - Ajustes de umbrales y características.
+ * @param {object} opciones - Parámetros de procesamiento (id_video, modo_edicion, plantilla, etc.).
  * @returns {Promise<object>}
  */
-export async function iniciarProcesamiento(idVideo, idPlantilla, opcionesAvanzadas) {
+export async function iniciarProcesamiento(opciones) {
   const cuerpoPeticion = {
-    id_video: idVideo,
-    plantilla: idPlantilla,
-    ajustes: opcionesAvanzadas
+    id_video: opciones.idVideo || opciones.id_video,
+    modo_edicion: opciones.modoEdicion || opciones.modo_edicion || 'shorts',
+    plantilla: opciones.plantilla || 'shooters_highlights',
+    cantidad_shorts: opciones.cantidadShorts || 3,
+    duracion_short_seg: opciones.duracionShortSeg || 35.0,
+    formato_vertical: opciones.formatoVertical !== undefined ? opciones.formatoVertical : true,
+    incluir_subtitulos: opciones.incluirSubtitulos !== undefined ? opciones.incluirSubtitulos : true,
+    ajustes: opciones.ajustes || null
   };
 
   const respuesta = await fetch(`${URL_BASE_API}/procesar`, {

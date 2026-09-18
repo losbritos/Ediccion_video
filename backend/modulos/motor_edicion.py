@@ -6,7 +6,7 @@ Orquesta los cortes, concatenaciones y ensamblado final de clips utilizando FFmp
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 from modulos.analizador_audio import obtener_ruta_ejecutable_ffmpeg
 
@@ -254,4 +254,137 @@ def aplicar_audio_ducking(
         raise RuntimeError(f"Error al aplicar audio ducking con FFmpeg: {proceso.stderr.strip()}")
 
     return str(salida.resolve())
+
+
+def escapar_ruta_filtro_ffmpeg(ruta: str) -> str:
+    """
+    Escapa una ruta de archivo en Windows para que FFmpeg la interprete correctamente
+    dentro de la sintaxis de filtros como 'subtitles'.
+    Convierte barras invertidas a slash posix y escapa los dos puntos ':' de las unidades de disco.
+
+    Args:
+        ruta: Ruta local al archivo.
+
+    Returns:
+        Cadena con la ruta escapada (ej. 'C\\:/carpeta/archivo.ass').
+    """
+    ruta_posix = Path(ruta).resolve().as_posix()
+    return ruta_posix.replace(":", "\\:")
+
+
+def renderizar_short_con_subtitulos(
+    ruta_video_origen: str,
+    tiempo_inicio: float,
+    duracion: float,
+    ruta_salida: str,
+    ruta_subtitulos_ass: Optional[str] = None,
+    formato_vertical: bool = False
+) -> str:
+    """
+    Renderiza un clip independiente (Short) a partir de una marca de tiempo del video original,
+    con opción de subtítulos dinámicos incrustados y formato vertical 9:16 (fondo desenfocado + acción centrada).
+
+    Args:
+        ruta_video_origen: Archivo de video fuente.
+        tiempo_inicio: Segundo de inicio del clip.
+        duracion: Duración del clip en segundos.
+        ruta_salida: Archivo destino MP4 generado.
+        ruta_subtitulos_ass: Ruta opcional a los subtítulos .ass que se quemarán (hardsub).
+        formato_vertical: Si es True, renderiza en lienzo 9:16 (1080x1920) ideal para TikTok y Shorts.
+
+    Returns:
+        Ruta absoluta al Short generado.
+
+    Raises:
+        FileNotFoundError: Si el video de entrada no existe.
+        RuntimeError: Si la renderización con FFmpeg falla.
+    """
+    archivo_origen = Path(ruta_video_origen)
+    if not archivo_origen.exists():
+        raise FileNotFoundError(f"Video de entrada no encontrado: {ruta_video_origen}")
+
+    salida = Path(ruta_salida)
+    salida.parent.mkdir(parents=True, exist_ok=True)
+
+    ejecutable = obtener_ruta_ejecutable_ffmpeg()
+    _, args_codec = detectar_codificador_optimo()
+
+    tiempo_inicio_seg = max(0.0, float(tiempo_inicio))
+    duracion_seg = max(0.5, float(duracion))
+
+    tiene_subtitulos = bool(ruta_subtitulos_ass and Path(ruta_subtitulos_ass).exists())
+    sub_escapada = escapar_ruta_filtro_ffmpeg(ruta_subtitulos_ass) if tiene_subtitulos else ""
+
+    comando_base = [
+        ejecutable, "-y",
+        "-ss", f"{tiempo_inicio_seg:.3f}",
+        "-t", f"{duracion_seg:.3f}",
+        "-i", str(archivo_origen)
+    ]
+
+    if formato_vertical:
+        # Lienzo vertical 9:16 (1080x1920)
+        # Capa fondo: reescalado a 1080x1920 recortado con desenfoque gaussiano/boxblur
+        # Capa frente: 1080 de ancho manteniendo aspecto nativo y centrada verticalmente
+        filtro_vertical = (
+            "[0:v]split=2[bg_in][fg_in];"
+            "[bg_in]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=20:20[bg];"
+            "[fg_in]scale=1080:-1[fg];"
+            "[bg][fg]overlay=(W-w)/2:(H-h)/2"
+        )
+        if tiene_subtitulos:
+            filtro_completo = f"{filtro_vertical}[comp];[comp]subtitles='{sub_escapada}'[vout]"
+        else:
+            filtro_completo = f"{filtro_vertical}[vout]"
+
+        comando = list(comando_base)
+        comando.extend([
+            "-filter_complex", filtro_completo,
+            "-map", "[vout]",
+            "-map", "0:a?"
+        ])
+        comando.extend(args_codec)
+        comando.extend([
+            "-c:a", "aac",
+            "-b:a", "192k",
+            str(salida)
+        ])
+    else:
+        # Formato estándar panorámico (16:9)
+        comando = list(comando_base)
+        if tiene_subtitulos:
+            comando.extend(["-vf", f"subtitles='{sub_escapada}'"])
+        comando.extend(args_codec)
+        comando.extend([
+            "-c:a", "aac",
+            "-b:a", "192k",
+            str(salida)
+        ])
+
+    proceso = subprocess.run(comando, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+    # Si hubo error (ej. codec NVENC incompatibilidad temporal de resolución), reintentar con CPU ultrafast
+    if proceso.returncode != 0:
+        comando_fallback = list(comando)
+        # Sustituir argumentos de codec por libx264 ultrafast
+        indices_eliminar = []
+        for idx, arg in enumerate(comando_fallback):
+            if arg in ["-c:v", "-preset", "-cq", "-crf"]:
+                indices_eliminar.extend([idx, idx + 1])
+
+        comando_limpio = [arg for idx, arg in enumerate(comando_fallback) if idx not in indices_eliminar]
+        # Insertar codec cpu antes de la ruta final de salida
+        posicion_insercion = len(comando_limpio) - 1
+        comando_limpio[posicion_insercion:posicion_insercion] = [
+            "-c:v", "libx264",
+            "-preset", "ultrafast",
+            "-crf", "22"
+        ]
+
+        proceso_cpu = subprocess.run(comando_limpio, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        if proceso_cpu.returncode != 0:
+            raise RuntimeError(f"Error al renderizar Short con FFmpeg: {proceso_cpu.stderr.strip()}")
+
+    return str(salida.resolve())
+
 

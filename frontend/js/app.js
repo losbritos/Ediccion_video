@@ -1,6 +1,7 @@
 /**
  * Controlador principal de la interfaz de usuario de AutoCut Studio.
- * Gestiona eventos de interfaz, selección de plantillas, carga de archivos y ciclo de renderizado.
+ * Gestiona eventos de interfaz, selector de modos (YouTube Shorts vs Video Completo),
+ * configuración de plantillas, carga de archivos, seguimiento del pipeline y galería interactiva.
  */
 
 import {
@@ -15,6 +16,10 @@ import {
 const estadoApp = {
   servidorConectado: false,
   archivoSeleccionado: null,
+  modoEdicion: 'shorts', // 'shorts' o 'video_completo'
+  cantidadShorts: 3,
+  duracionShortSeg: 40,
+  formatoVertical: true,
   idPlantillaSeleccionada: 'shooters_highlights',
   enProceso: false,
   ajustes: {
@@ -27,7 +32,7 @@ const estadoApp = {
   }
 };
 
-// Referencias del DOM
+// Referencias a los elementos del DOM
 const elementos = {
   insigniaServidor: document.getElementById('insignia-servidor'),
   puntoEstado: document.querySelector('.punto-estado'),
@@ -39,8 +44,19 @@ const elementos = {
   nombreArchivo: document.getElementById('nombre-archivo-seleccionado'),
   tamanoArchivo: document.getElementById('tamano-archivo-seleccionado'),
   botonQuitarVideo: document.getElementById('boton-quitar-video'),
+
+  // Modos de Edición
+  tarjetasModo: document.querySelectorAll('.tarjeta-modo'),
+  panelAjustesShorts: document.getElementById('panel-ajustes-shorts'),
+  btnsCantidadShorts: document.querySelectorAll('#selector-cantidad-shorts .btn-opcion'),
+  btnsDuracionShorts: document.querySelectorAll('#selector-duracion-shorts .btn-opcion'),
+  tarjetasFormato: document.querySelectorAll('.tarjeta-formato'),
+
+  // Plantillas
   tarjetasPlantilla: document.querySelectorAll('.tarjeta-plantilla'),
   resumenModo: document.getElementById('resumen-modo'),
+
+  // Ajustes de Silencio y Efectos
   sliderUmbral: document.getElementById('slider-umbral-silencio'),
   valorUmbral: document.getElementById('valor-umbral-silencio'),
   sliderDuracion: document.getElementById('slider-duracion-silencio'),
@@ -50,11 +66,22 @@ const elementos = {
   checkDucking: document.getElementById('check-audio-ducking'),
   checkGpu: document.getElementById('check-aceleracion-gpu'),
   botonRestablecer: document.getElementById('boton-restablecer-ajustes'),
+
+  // Ejecución y Progreso
   botonIniciarEdicion: document.getElementById('boton-iniciar-edicion'),
+  textoBotonIniciar: document.getElementById('texto-boton-iniciar'),
   etiquetaPorcentaje: document.getElementById('etiqueta-porcentaje'),
   barraProgresoRelleno: document.getElementById('barra-progreso-relleno'),
   cuerpoConsolaLogs: document.getElementById('cuerpo-consola-logs'),
   botonLimpiarLogs: document.getElementById('boton-limpiar-logs'),
+
+  // Reproductor y Resultados
+  placeholderReproductor: document.getElementById('placeholder-reproductor'),
+  textoPlaceholderReproductor: document.getElementById('texto-placeholder-reproductor'),
+  reproductorVideoFinal: document.getElementById('reproductor-video-final'),
+  seccionShortsGenerados: document.getElementById('seccion-shorts-generados'),
+  contenedorTarjetasShorts: document.getElementById('contenedor-tarjetas-shorts'),
+  conteoShortsGenerados: document.getElementById('conteo-shorts-generados'),
   gridMetricas: document.getElementById('grid-metricas-resultado'),
   metricaOriginal: document.getElementById('metrica-duracion-original'),
   metricaEditado: document.getElementById('metrica-duracion-editado'),
@@ -62,6 +89,8 @@ const elementos = {
   metricaCortes: document.getElementById('metrica-cortes'),
   badgeListo: document.getElementById('badge-video-listo'),
   accionesExportacion: document.getElementById('acciones-exportacion'),
+  enlaceDescargaVideo: document.getElementById('enlace-descarga-video'),
+
   etapas: {
     audio: document.getElementById('etapa-audio'),
     vision: document.getElementById('etapa-vision'),
@@ -72,28 +101,31 @@ const elementos = {
 };
 
 /**
- * Inicialización de la aplicación al cargar la página.
+ * Inicialización al cargar la página.
  */
 document.addEventListener('DOMContentLoaded', () => {
   configurarEventosCargaArchivos();
+  configurarEventosModosEdicion();
   configurarEventosPlantillas();
   configurarEventosAjustes();
   configurarEventosEjecucion();
+  actualizarTextoResumenModo();
   comprobarConectividadServidor();
 
-  // Revisar estado del servidor periódicamente
+  // Comprobar estado del servidor en segundo plano
   setInterval(comprobarConectividadServidor, 6000);
 });
 
 /**
- * Verifica si el backend local de FastAPI está activo y actualiza la insignia de estado.
+ * Verifica si el backend FastAPI está activo y actualiza la insignia visual.
  */
 async function comprobarConectividadServidor() {
   const resultado = await verificarEstadoServidor();
   if (resultado.conectado) {
     estadoApp.servidorConectado = true;
     elementos.puntoEstado.classList.add('conectado');
-    elementos.textoEstadoServidor.textContent = 'Backend Conectado (Local)';
+    const gpuInfo = resultado.datos?.aceleracion_disponible ? ' (GPU NVIDIA activa)' : ' (CPU)';
+    elementos.textoEstadoServidor.textContent = `Backend Conectado${gpuInfo}`;
   } else {
     estadoApp.servidorConectado = false;
     elementos.puntoEstado.classList.remove('conectado');
@@ -116,7 +148,6 @@ function configurarEventosCargaArchivos() {
     }
   });
 
-  // Eventos de arrastre
   ['dragenter', 'dragover'].forEach(nombreEvento => {
     elementos.zonaSoltar.addEventListener(nombreEvento, (evento) => {
       evento.preventDefault();
@@ -166,6 +197,86 @@ function registrarArchivoSeleccionado(archivo) {
 }
 
 /**
+ * Configuración del selector de Modos de Edición (Shorts vs Video Completo) y opciones de Shorts.
+ */
+function configurarEventosModosEdicion() {
+  // Selector principal de modo
+  elementos.tarjetasModo.forEach(tarjeta => {
+    tarjeta.addEventListener('click', () => {
+      elementos.tarjetasModo.forEach(t => t.classList.remove('seleccionada'));
+      tarjeta.classList.add('seleccionada');
+
+      const modo = tarjeta.dataset.modo;
+      estadoApp.modoEdicion = modo;
+
+      if (modo === 'shorts') {
+        elementos.panelAjustesShorts.classList.remove('oculto');
+        elementos.textoBotonIniciar.textContent = 'Iniciar Generación de Shorts';
+        agregarLogConsola('Modo cambiado a: Generador de YouTube Shorts (clips de momentos cumbre).');
+      } else {
+        elementos.panelAjustesShorts.classList.add('oculto');
+        elementos.textoBotonIniciar.textContent = 'Iniciar Edición Automática';
+        agregarLogConsola('Modo cambiado a: Video Completo Continuo (corte de pausas).');
+      }
+
+      actualizarTextoResumenModo();
+    });
+  });
+
+  // Selector de cantidad de Shorts
+  elementos.btnsCantidadShorts.forEach(btn => {
+    btn.addEventListener('click', () => {
+      elementos.btnsCantidadShorts.forEach(b => b.classList.remove('activo'));
+      btn.classList.add('activo');
+      estadoApp.cantidadShorts = parseInt(btn.dataset.cantidad, 10);
+      actualizarTextoResumenModo();
+      agregarLogConsola(`Cantidad de Shorts configurada en: ${estadoApp.cantidadShorts}`);
+    });
+  });
+
+  // Selector de duración por Short
+  elementos.btnsDuracionShorts.forEach(btn => {
+    btn.addEventListener('click', () => {
+      elementos.btnsDuracionShorts.forEach(b => b.classList.remove('activo'));
+      btn.classList.add('activo');
+      estadoApp.duracionShortSeg = parseFloat(btn.dataset.duracion);
+      actualizarTextoResumenModo();
+      agregarLogConsola(`Duración objetivo por Short: ${estadoApp.duracionShortSeg} segundos`);
+    });
+  });
+
+  // Selector de formato de pantalla (Vertical 9:16 vs Panorámico 16:9)
+  elementos.tarjetasFormato.forEach(tarjeta => {
+    tarjeta.addEventListener('click', () => {
+      elementos.tarjetasFormato.forEach(t => t.classList.remove('activo'));
+      tarjeta.classList.add('activo');
+
+      const esVertical = tarjeta.dataset.formato === 'vertical';
+      estadoApp.formatoVertical = esVertical;
+      actualizarTextoResumenModo();
+      agregarLogConsola(`Formato de video configurado en: ${esVertical ? 'Vertical 9:16 (Shorts/TikTok)' : 'Panorámico 16:9'}`);
+    });
+  });
+}
+
+/**
+ * Actualiza el encabezado de resumen en la tarjeta de inicio.
+ */
+function actualizarTextoResumenModo() {
+  if (estadoApp.modoEdicion === 'shorts') {
+    const formato = estadoApp.formatoVertical ? 'Vertical 9:16' : '16:9';
+    elementos.resumenModo.textContent = `YouTube Shorts: ${estadoApp.cantidadShorts} clips (${formato}, ~${estadoApp.duracionShortSeg}s c/u)`;
+  } else {
+    elementos.resumenModo.textContent = `Video Completo: ${obtenerNombrePlantillaActual()}`;
+  }
+}
+
+function obtenerNombrePlantillaActual() {
+  const tarjetaSel = document.querySelector('.tarjeta-plantilla.seleccionada');
+  return tarjetaSel ? tarjetaSel.querySelector('.nombre-plantilla').textContent : 'Gaming';
+}
+
+/**
  * Configuración de las tarjetas de selección de estilo/plantilla.
  */
 function configurarEventosPlantillas() {
@@ -178,8 +289,7 @@ function configurarEventosPlantillas() {
       estadoApp.idPlantillaSeleccionada = idPlantilla;
 
       const nombrePlantilla = tarjeta.querySelector('.nombre-plantilla').textContent;
-      elementos.resumenModo.textContent = `Plantilla: ${nombrePlantilla}`;
-
+      actualizarTextoResumenModo();
       aplicarValoresPredeterminadosPlantilla(idPlantilla);
       agregarLogConsola(`Plantilla cambiada a: ${nombrePlantilla}`);
     });
@@ -227,6 +337,11 @@ function configurarEventosAjustes() {
     estadoApp.ajustes.duracionSilencioSeg = parseFloat(valor);
   });
 
+  elementos.checkSubtitulos.addEventListener('change', (e) => {
+    estadoApp.ajustes.subtitulosIa = e.target.checked;
+    agregarLogConsola(`Subtítulos dinámicos de IA: ${e.target.checked ? 'Activados' : 'Desactivados'}`);
+  });
+
   elementos.botonRestablecer.addEventListener('click', () => {
     aplicarValoresPredeterminadosPlantilla(estadoApp.idPlantillaSeleccionada);
     agregarLogConsola('Ajustes restablecidos a los valores predeterminados del perfil.');
@@ -265,7 +380,7 @@ async function iniciarFlujoEdicion() {
 
   agregarLogConsola('==============================================');
   agregarLogConsola(`Iniciando AutoCut Studio en "${estadoApp.archivoSeleccionado.name}"`);
-  agregarLogConsola(`Plantilla activa: ${estadoApp.idPlantillaSeleccionada}`);
+  agregarLogConsola(`Modo: ${estadoApp.modoEdicion.toUpperCase()} | Plantilla: ${estadoApp.idPlantillaSeleccionada}`);
 
   if (estadoApp.servidorConectado) {
     try {
@@ -274,27 +389,32 @@ async function iniciarFlujoEdicion() {
       agregarLogConsola(`Transfiriendo video al motor local (${formatearTamanoBytes(estadoApp.archivoSeleccionado.size)})...`);
 
       const datosSubida = await subirVideoLocal(estadoApp.archivoSeleccionado, (porcentajeSubida) => {
-        // Reflejar la subida en la interfaz
-        elementos.textoEstadoServidor.textContent = `Subiendo: ${porcentajeSubida}%`;
+        elementos.textoEstadoServidor.textContent = `Subiendo archivo: ${porcentajeSubida}%`;
         if (porcentajeSubida % 25 === 0 && porcentajeSubida > 0 && porcentajeSubida < 100) {
-          agregarLogConsola(`Progreso de carga del archivo: ${porcentajeSubida}%`);
+          agregarLogConsola(`Progreso de subida: ${porcentajeSubida}%`);
         }
       });
 
       elementos.textoEstadoServidor.textContent = 'Backend Conectado (Local)';
       agregarLogConsola(`Video registrado con éxito: "${datosSubida.nombre}" (ID: ${datosSubida.id_video})`);
 
-      // 2. Iniciar tarea
-      const datosTarea = await iniciarProcesamiento(
-        datosSubida.id_video,
-        estadoApp.idPlantillaSeleccionada,
-        {
+      // 2. Iniciar tarea con todos los parámetros
+      const datosTarea = await iniciarProcesamiento({
+        idVideo: datosSubida.id_video,
+        modoEdicion: estadoApp.modoEdicion,
+        plantilla: estadoApp.idPlantillaSeleccionada,
+        cantidadShorts: estadoApp.cantidadShorts,
+        duracionShortSeg: estadoApp.duracionShortSeg,
+        formatoVertical: estadoApp.formatoVertical,
+        incluirSubtitulos: estadoApp.ajustes.subtitulosIa,
+        ajustes: {
           ajustes_audio: {
             umbral_silencio_db: estadoApp.ajustes.umbralSilencioDb,
             duracion_minima_silencio_segundos: estadoApp.ajustes.duracionSilencioSeg
           }
         }
-      );
+      });
+
       const idTarea = datosTarea.id_tarea;
       agregarLogConsola(`Tarea encolada con ID: ${idTarea}`);
 
@@ -324,13 +444,17 @@ async function iniciarFlujoEdicion() {
           marcarEtapaCompletada('render');
           const res = estadoTarea.resultado || {};
 
-          mostrarResultadosFinales({
-            duracionOriginal: res.duracion_original ? `${res.duracion_original}s` : '00:00',
-            duracionEditado: res.duracion_final_estimada ? `${res.duracion_final_estimada}s` : '00:00',
-            ahorro: res.ahorro_tiempo_porcentaje ? `-${res.ahorro_tiempo_porcentaje}%` : '0%',
-            cortes: res.cantidad_cortes || 0,
-            urlDescarga: `http://127.0.0.1:8000/api/descargar/${idTarea}`
-          });
+          if (estadoTarea.modo_edicion === 'shorts' || res.modo === 'shorts') {
+            mostrarResultadosShorts(res.shorts || [], idTarea);
+          } else {
+            mostrarResultadosFinales({
+              duracionOriginal: res.duracion_original ? `${res.duracion_original}s` : '00:00',
+              duracionEditado: res.duracion_final_estimada ? `${res.duracion_final_estimada}s` : '00:00',
+              ahorro: res.ahorro_tiempo_porcentaje ? `-${res.ahorro_tiempo_porcentaje}%` : '0%',
+              cortes: res.cantidad_cortes || 0,
+              urlDescarga: `http://127.0.0.1:8000/api/descargar/${idTarea}`
+            });
+          }
         } else if (estadoTarea.estado === 'error') {
           throw new Error(estadoTarea.error || 'Error desconocido en el procesamiento');
         }
@@ -340,7 +464,7 @@ async function iniciarFlujoEdicion() {
       alert(`Error durante el procesamiento: ${err.message}`);
     }
   } else {
-    // Modo demostrativo local (cuando el backend está apagado)
+    // Modo demostrativo local (cuando el backend no está iniciado)
     await ejecutarSimulacionDemostrativa();
   }
 
@@ -349,55 +473,158 @@ async function iniciarFlujoEdicion() {
 }
 
 /**
- * Simulación visual fluida para exploración cuando el backend no está iniciado.
+ * Simulación visual fluida para exploración sin backend encendido.
  */
 async function ejecutarSimulacionDemostrativa() {
   marcarEtapaActiva('audio');
-  agregarLogConsola('[1/5] Extrayendo pista de audio WAV (16kHz PCM)...');
-  await simularRetardo(1000);
-  agregarLogConsola('[1/5] Analizando decibelios ($dB$) y detectando pausas y silencios...');
+  agregarLogConsola('[1/5] Extrayendo pista de audio WAV y analizando energía...');
   await simularRetardo(1000);
   actualizarBarraProgreso(25);
   marcarEtapaCompletada('audio');
 
   marcarEtapaActiva('vision');
-  agregarLogConsola('[2/5] Muestreando keyframes con OpenCV...');
+  agregarLogConsola('[2/5] Muestreando keyframes con OpenCV para medir intensidad visual...');
   await simularRetardo(1000);
   actualizarBarraProgreso(50);
   marcarEtapaCompletada('vision');
 
   marcarEtapaActiva('whisper');
-  agregarLogConsola('[3/5] Transcripción local con Faster-Whisper y subtítulos dinámicos...');
+  agregarLogConsola('[3/5] Transcribiendo diálogos con Faster-Whisper para subtítulos dinámicos...');
   await simularRetardo(1000);
   actualizarBarraProgreso(75);
   marcarEtapaCompletada('whisper');
 
   marcarEtapaActiva('montaje');
-  agregarLogConsola('[4/5] Director de Montaje calculando "Puntuación de Atención"...');
+  agregarLogConsola('[4/5] Director de Montaje seleccionando los momentos cumbre...');
   await simularRetardo(800);
   actualizarBarraProgreso(90);
   marcarEtapaCompletada('montaje');
 
   marcarEtapaActiva('render');
-  agregarLogConsola('[5/5] Renderizando video final mediante FFmpeg...');
+  agregarLogConsola('[5/5] Renderizando clips con FFmpeg y quemando subtítulos...');
   await simularRetardo(1000);
   actualizarBarraProgreso(100);
   marcarEtapaCompletada('render');
 
-  agregarLogConsola('¡Procesamiento completado con éxito!');
-  mostrarResultadosFinales({
-    duracionOriginal: '22:45',
-    duracionEditado: '08:12',
-    ahorro: '-64%',
-    cortes: '148',
-    urlDescarga: '#'
-  });
+  agregarLogConsola('¡Procesamiento demostrativo completado con éxito!');
+
+  if (estadoApp.modoEdicion === 'shorts') {
+    const shortsDemo = [
+      { indice: 1, tiempo_formateado: '02:40', duracion: 35, puntuacion_atencion: 94.2, formato: '9:16 Vertical', nombre_archivo: 'short_1.mp4', url_descarga: '#' },
+      { indice: 2, tiempo_formateado: '07:15', duracion: 40, puntuacion_atencion: 89.6, formato: '9:16 Vertical', nombre_archivo: 'short_2.mp4', url_descarga: '#' },
+      { indice: 3, tiempo_formateado: '14:50', duracion: 35, puntuacion_atencion: 86.4, formato: '9:16 Vertical', nombre_archivo: 'short_3.mp4', url_descarga: '#' }
+    ];
+    mostrarResultadosShorts(shortsDemo, 'demo');
+  } else {
+    mostrarResultadosFinales({
+      duracionOriginal: '22:45',
+      duracionEditado: '08:12',
+      ahorro: '-64%',
+      cortes: '148',
+      urlDescarga: '#'
+    });
+  }
 }
 
 /**
- * Muestra las métricas calculadas y activa la descarga del video procesado.
+ * Renderiza la galería interactiva de Shorts generados con previsualización y descarga.
+ * @param {Array<object>} shorts - Lista de shorts generados con metadatos.
+ * @param {string} idTarea - Identificador de la tarea para URLs de descarga.
+ */
+function mostrarResultadosShorts(shorts, idTarea) {
+  elementos.badgeListo.classList.remove('oculto');
+  elementos.gridMetricas.classList.add('oculto');
+  elementos.accionesExportacion.classList.add('oculto');
+  elementos.seccionShortsGenerados.classList.remove('oculto');
+
+  elementos.conteoShortsGenerados.textContent = shorts.length;
+  elementos.contenedorTarjetasShorts.innerHTML = '';
+
+  if (!shorts || shorts.length === 0) {
+    elementos.contenedorTarjetasShorts.innerHTML = '<p class="texto-secundario">No se generaron shorts para este video.</p>';
+    return;
+  }
+
+  shorts.forEach((short, idx) => {
+    const urlDescarga = short.url_descarga
+      ? (short.url_descarga.startsWith('http') ? short.url_descarga : `http://127.0.0.1:8000${short.url_descarga}`)
+      : `http://127.0.0.1:8000/api/descargar_short/${idTarea}/${short.indice}`;
+
+    const tarjeta = document.createElement('div');
+    tarjeta.className = `tarjeta-short-item ${idx === 0 ? 'activo' : ''}`;
+    tarjeta.dataset.indice = short.indice;
+    tarjeta.dataset.url = urlDescarga;
+
+    tarjeta.innerHTML = `
+      <div class="info-short-item">
+        <span class="badge-indice-short">#${short.indice}</span>
+        <div class="detalles-short-item">
+          <span class="titulo-short-item">Short #${short.indice} • Minuto ${short.tiempo_formateado || '00:00'}</span>
+          <div class="meta-tags-short">
+            <span class="tag-short score">Puntuación: ${short.puntuacion_atencion}</span>
+            <span class="tag-short">${short.duracion}s</span>
+            <span class="tag-short formato">${short.formato || '9:16'}</span>
+          </div>
+        </div>
+      </div>
+      <div class="acciones-short-item">
+        <button type="button" class="btn-short-accion btn-short-ver" title="Reproducir en el visor">
+          ▶ Ver en Visor
+        </button>
+        <a href="${urlDescarga}" class="btn-short-accion btn-short-descargar" download="${short.nombre_archivo || `short_${short.indice}.mp4`}" title="Descargar archivo MP4">
+          ⬇ Descargar
+        </a>
+      </div>
+    `;
+
+    // Evento de reproducción al hacer clic en la tarjeta o en el botón ver
+    const activarEsteShort = () => {
+      document.querySelectorAll('.tarjeta-short-item').forEach(t => t.classList.remove('activo'));
+      tarjeta.classList.add('activo');
+      cargarVideoEnReproductor(urlDescarga);
+    };
+
+    tarjeta.addEventListener('click', (e) => {
+      // Evitar que el clic en el botón de descarga dispare la selección de tarjeta
+      if (!e.target.closest('.btn-short-descargar')) {
+        activarEsteShort();
+      }
+    });
+
+    elementos.contenedorTarjetasShorts.appendChild(tarjeta);
+  });
+
+  // Cargar automáticamente el primer Short en el reproductor
+  const primeraUrl = shorts[0].url_descarga
+    ? (shorts[0].url_descarga.startsWith('http') ? shorts[0].url_descarga : `http://127.0.0.1:8000${shorts[0].url_descarga}`)
+    : `http://127.0.0.1:8000/api/descargar_short/${idTarea}/${shorts[0].indice}`;
+
+  cargarVideoEnReproductor(primeraUrl);
+}
+
+/**
+ * Carga un video en el reproductor HTML5 y lo reproduce.
+ * @param {string} urlVideo - URL del video a cargar.
+ */
+function cargarVideoEnReproductor(urlVideo) {
+  if (elementos.placeholderReproductor) {
+    elementos.placeholderReproductor.classList.add('oculto');
+  }
+  if (elementos.reproductorVideoFinal) {
+    elementos.reproductorVideoFinal.classList.remove('oculto');
+    elementos.reproductorVideoFinal.src = urlVideo;
+    elementos.reproductorVideoFinal.load();
+    elementos.reproductorVideoFinal.play().catch(() => {
+      // Ignorar si el navegador bloquea autoplay sin interacción previa
+    });
+  }
+}
+
+/**
+ * Muestra las métricas calculadas para video completo y activa la descarga.
  */
 function mostrarResultadosFinales(datosMetricas) {
+  elementos.seccionShortsGenerados.classList.add('oculto');
   elementos.gridMetricas.classList.remove('oculto');
   elementos.badgeListo.classList.remove('oculto');
   elementos.accionesExportacion.classList.remove('oculto');
@@ -408,18 +635,10 @@ function mostrarResultadosFinales(datosMetricas) {
   elementos.metricaCortes.textContent = datosMetricas.cortes;
 
   if (datosMetricas.urlDescarga && datosMetricas.urlDescarga !== '#') {
-    const enlace = document.getElementById('enlace-descarga-video');
-    if (enlace) {
-      enlace.href = datosMetricas.urlDescarga;
+    if (elementos.enlaceDescargaVideo) {
+      elementos.enlaceDescargaVideo.href = datosMetricas.urlDescarga;
     }
-    const reproductor = document.getElementById('reproductor-video-final');
-    const placeholder = document.getElementById('placeholder-reproductor');
-    if (reproductor && placeholder) {
-      placeholder.classList.add('oculto');
-      reproductor.classList.remove('oculto');
-      reproductor.src = datosMetricas.urlDescarga;
-      reproductor.load();
-    }
+    cargarVideoEnReproductor(datosMetricas.urlDescarga);
   }
 }
 
@@ -427,6 +646,7 @@ function ocultarResultadosPrevios() {
   elementos.gridMetricas.classList.add('oculto');
   elementos.badgeListo.classList.add('oculto');
   elementos.accionesExportacion.classList.add('oculto');
+  elementos.seccionShortsGenerados.classList.add('oculto');
 }
 
 function actualizarBarraProgreso(porcentaje) {
@@ -450,7 +670,7 @@ function marcarEtapaCompletada(nombreEtapa) {
 
 function limpiarEstadosEtapas() {
   Object.values(elementos.etapas).forEach(etapa => {
-    etapa.classList.remove('activa', 'completada');
+    if (etapa) etapa.classList.remove('activa', 'completada');
   });
 }
 

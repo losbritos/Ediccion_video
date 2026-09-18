@@ -116,7 +116,8 @@ def generar_subtitulos_ass_animados(
     ruta_salida_ass: str,
     color_primario_hex: str = "#FFEA00",
     color_borde_hex: str = "#000000",
-    tamano_fuente: int = 42
+    tamano_fuente: int = 42,
+    formato_vertical: bool = False
 ) -> str:
     """
     Genera un archivo de subtítulos animados (.ass) con tipografía llamativa,
@@ -128,6 +129,7 @@ def generar_subtitulos_ass_animados(
         color_primario_hex: Color de relleno del texto en hexadecimal.
         color_borde_hex: Color del contorno del texto en hexadecimal.
         tamano_fuente: Tamaño de fuente en puntos.
+        formato_vertical: True para adaptar la resolución y márgenes a 9:16 (1080x1920).
 
     Returns:
         Ruta absoluta al archivo .ass generado.
@@ -138,16 +140,21 @@ def generar_subtitulos_ass_animados(
     color_primario_ass = convertir_hex_a_color_ass(color_primario_hex)
     color_borde_ass = convertir_hex_a_color_ass(color_borde_hex)
 
+    res_x = 1080 if formato_vertical else 1920
+    res_y = 1920 if formato_vertical else 1080
+    tamano = 56 if formato_vertical and tamano_fuente == 42 else tamano_fuente
+    margen_v = 480 if formato_vertical else 90
+
     # Cabecera estándar de archivo ASS con estilo moderno (fuente gruesa, sombra, alineación central)
     cabecera_ass = f"""[Script Info]
 ScriptType: v4.00+
-PlayResX: 1920
-PlayResY: 1080
+PlayResX: {res_x}
+PlayResY: {res_y}
 ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: GamingSub,Arial Black,{tamano_fuente},{color_primario_ass},&H0000FFFF&,{color_borde_ass},&H80000000&,-1,0,0,0,100,100,0,0,1,4.5,2,2,40,40,90,1
+Style: GamingSub,Arial Black,{tamano},{color_primario_ass},&H0000FFFF&,{color_borde_ass},&H80000000&,-1,0,0,0,100,100,0,0,1,4.5,2,2,40,40,{margen_v},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text

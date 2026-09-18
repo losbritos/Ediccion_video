@@ -65,7 +65,12 @@ aplicacion.add_middleware(
 class SolicitudProcesamiento(BaseModel):
     """Modelo de solicitud para iniciar edición automática."""
     id_video: str
+    modo_edicion: str = "shorts"  # "shorts" o "video_completo"
     plantilla: str = "shooters_highlights"
+    cantidad_shorts: int = 3
+    duracion_short_seg: float = 35.0
+    formato_vertical: bool = True
+    incluir_subtitulos: bool = True
     ajustes: Optional[Dict[str, Any]] = None
 
 
@@ -123,9 +128,20 @@ async def subir_video_para_procesar(archivo: UploadFile = File(...)) -> Dict[str
     }
 
 
-def tarea_segundo_plano_procesar(id_tarea: str, id_video: str, id_plantilla: str, ajustes: Optional[Dict[str, Any]]) -> None:
+def tarea_segundo_plano_procesar(
+    id_tarea: str,
+    id_video: str,
+    modo_edicion: str,
+    id_plantilla: str,
+    cantidad_shorts: int,
+    duracion_short_seg: float,
+    formato_vertical: bool,
+    incluir_subtitulos: bool,
+    ajustes: Optional[Dict[str, Any]]
+) -> None:
     """
     Worker que ejecuta el ciclo de análisis y renderizado en segundo plano sin bloquear el servidor.
+    Soporta tanto el modo de generación de múltiples Shorts como el modo de video completo.
     """
     registro_tareas[id_tarea]["estado"] = "en_proceso"
     info_video = registro_videos.get(id_video)
@@ -136,7 +152,6 @@ def tarea_segundo_plano_procesar(id_tarea: str, id_video: str, id_plantilla: str
 
     ruta_origen = info_video["ruta"]
     nombre_base = Path(ruta_origen).stem
-    ruta_salida = str(RUTA_ARCHIVOS_RENDER / f"render_{id_tarea}_{nombre_base}.mp4")
 
     def notificar_progreso(porcentaje: int, etapa: str, mensaje: str) -> None:
         registro_tareas[id_tarea]["progreso"] = porcentaje
@@ -144,18 +159,45 @@ def tarea_segundo_plano_procesar(id_tarea: str, id_video: str, id_plantilla: str
         registro_tareas[id_tarea]["logs"].append(f"[{time.strftime('%H:%M:%S')}] {mensaje}")
 
     try:
-        resultado = director_montaje.procesar_video_completo(
-            ruta_video_entrada=ruta_origen,
-            ruta_video_salida=ruta_salida,
-            id_plantilla=id_plantilla,
-            ajustes_personalizados=ajustes,
-            callback_progreso=notificar_progreso
-        )
+        if modo_edicion == "shorts":
+            dir_salida_shorts = RUTA_ARCHIVOS_RENDER / f"tarea_{id_tarea}"
+            resultado = director_montaje.procesar_generacion_shorts(
+                ruta_video_entrada=ruta_origen,
+                directorio_salida=str(dir_salida_shorts),
+                id_plantilla=id_plantilla,
+                cantidad_shorts=cantidad_shorts,
+                duracion_short_segundos=duracion_short_seg,
+                formato_vertical=formato_vertical,
+                incluir_subtitulos=incluir_subtitulos,
+                ajustes_personalizados=ajustes,
+                callback_progreso=notificar_progreso
+            )
 
-        registro_tareas[id_tarea]["estado"] = "completado"
-        registro_tareas[id_tarea]["completado"] = True
-        registro_tareas[id_tarea]["ruta_video_final"] = ruta_salida
-        registro_tareas[id_tarea]["resultado"] = resultado
+            # Enriquecer cada short con su URL relativa para consumo por el cliente
+            for sh in resultado.get("shorts", []):
+                sh["url_descarga"] = f"/api/descargar_short/{id_tarea}/{sh['indice']}"
+
+            registro_tareas[id_tarea]["estado"] = "completado"
+            registro_tareas[id_tarea]["completado"] = True
+            registro_tareas[id_tarea]["resultado"] = resultado
+            if resultado.get("shorts"):
+                registro_tareas[id_tarea]["ruta_video_final"] = resultado["shorts"][0]["ruta_archivo"]
+
+        else:
+            # Modo video completo (corte de pausas en toda la partida)
+            ruta_salida = str(RUTA_ARCHIVOS_RENDER / f"render_{id_tarea}_{nombre_base}.mp4")
+            resultado = director_montaje.procesar_video_completo(
+                ruta_video_entrada=ruta_origen,
+                ruta_video_salida=ruta_salida,
+                id_plantilla=id_plantilla,
+                ajustes_personalizados=ajustes,
+                callback_progreso=notificar_progreso
+            )
+
+            registro_tareas[id_tarea]["estado"] = "completado"
+            registro_tareas[id_tarea]["completado"] = True
+            registro_tareas[id_tarea]["ruta_video_final"] = ruta_salida
+            registro_tareas[id_tarea]["resultado"] = resultado
 
     except Exception as excepcion:
         registro_tareas[id_tarea]["estado"] = "error"
@@ -178,6 +220,7 @@ def iniciar_procesamiento_automatico(
     registro_tareas[id_tarea] = {
         "id_tarea": id_tarea,
         "id_video": solicitud.id_video,
+        "modo_edicion": solicitud.modo_edicion,
         "estado": "en_cola",
         "progreso": 0,
         "etapa": "iniciando",
@@ -191,7 +234,12 @@ def iniciar_procesamiento_automatico(
         tarea_segundo_plano_procesar,
         id_tarea,
         solicitud.id_video,
+        solicitud.modo_edicion,
         solicitud.plantilla,
+        solicitud.cantidad_shorts,
+        solicitud.duracion_short_seg,
+        solicitud.formato_vertical,
+        solicitud.incluir_subtitulos,
         solicitud.ajustes
     )
 
@@ -217,7 +265,7 @@ def consultar_progreso_edicion(id_tarea: str) -> Dict[str, Any]:
 @aplicacion.get("/api/descargar/{id_tarea}")
 def descargar_video_procesado(id_tarea: str):
     """
-    Descarga o sirve el video final renderizado en formato MP4.
+    Descarga o sirve el video final renderizado en formato MP4 (para video completo o primer short).
     """
     tarea = registro_tareas.get(id_tarea)
     if not tarea or not tarea.get("completado"):
@@ -232,6 +280,39 @@ def descargar_video_procesado(id_tarea: str):
         media_type="video/mp4",
         filename=Path(ruta_archivo).name
     )
+
+
+@aplicacion.get("/api/descargar_short/{id_tarea}/{indice_short}")
+def descargar_short_individual(id_tarea: str, indice_short: int):
+    """
+    Descarga o sirve un Short individual generado dentro de la tarea indicada.
+    """
+    tarea = registro_tareas.get(id_tarea)
+    if not tarea or not tarea.get("completado"):
+        raise HTTPException(status_code=404, detail="Los Shorts aún no están listos.")
+
+    resultado = tarea.get("resultado", {})
+    shorts = resultado.get("shorts", [])
+
+    short_encontrado = None
+    for sh in shorts:
+        if sh.get("indice") == indice_short:
+            short_encontrado = sh
+            break
+
+    if not short_encontrado:
+        raise HTTPException(status_code=404, detail=f"Short #{indice_short} no encontrado.")
+
+    ruta_archivo = short_encontrado.get("ruta_archivo")
+    if not ruta_archivo or not Path(ruta_archivo).exists():
+        raise HTTPException(status_code=404, detail="El archivo del Short no existe en disco.")
+
+    return FileResponse(
+        path=ruta_archivo,
+        media_type="video/mp4",
+        filename=Path(ruta_archivo).name
+    )
+
 
 
 # Servir la interfaz web local directamente en http://127.0.0.1:8000/

@@ -213,3 +213,138 @@ def aplicar_zoom_dinamico_a_clip(
         raise RuntimeError(f"Error al aplicar zoom con FFmpeg: {proceso.stderr.strip()}")
 
     return str(salida.resolve())
+
+
+def agrupar_momentos_cumbre(
+    bloques_atencion: List[Dict[str, Any]],
+    duracion_total: float,
+    cantidad_shorts: int = 3,
+    duracion_short_segundos: float = 35.0,
+    distancia_minima_segundos: float = 45.0
+) -> List[Dict[str, Any]]:
+    """
+    Identifica los momentos cumbre más destacados a partir de los bloques de atención,
+    garantizando que no se solapen y extrayendo ventanas de tiempo con contexto natural
+    (antes, durante y después de la jugada clave).
+
+    Args:
+        bloques_atencion: Lista de bloques temporales con 'puntuacion_atencion'.
+        duracion_total: Duración total del video original en segundos.
+        cantidad_shorts: Número de momentos/shorts deseados.
+        duracion_short_segundos: Duración objetivo de cada short.
+        distancia_minima_segundos: Separación mínima entre clímax de diferentes shorts.
+
+    Returns:
+        Lista de especificaciones de shorts ordenados cronológicamente:
+        [
+            {
+                "indice": 1,
+                "inicio": 120.0,
+                "fin": 155.0,
+                "duracion": 35.0,
+                "puntuacion_atencion": 89.4,
+                "tiempo_climax": 134.0,
+                "descripcion": "Short 1: Minuto 02:00 (Puntaje: 89.4)"
+            }
+        ]
+    """
+    if not bloques_atencion or duracion_total <= 0 or cantidad_shorts <= 0:
+        return []
+
+    # Si el video completo es menor o igual a la duración del short, devolver todo el video
+    if duracion_total <= duracion_short_segundos:
+        return [{
+            "indice": 1,
+            "inicio": 0.0,
+            "fin": round(duracion_total, 2),
+            "duracion": round(duracion_total, 2),
+            "puntuacion_atencion": round(float(np.mean([b["puntuacion_atencion"] for b in bloques_atencion])), 1),
+            "tiempo_climax": round(duracion_total / 2.0, 2),
+            "descripcion": "Short 1: Video completo"
+        }]
+
+    # Ordenar bloques candidatos por puntuación de atención de mayor a menor
+    candidatos_ordenados = sorted(
+        bloques_atencion,
+        key=lambda b: b.get("puntuacion_atencion", 0.0),
+        reverse=True
+    )
+
+    momentos_seleccionados: List[Dict[str, Any]] = []
+
+    for bloque in candidatos_ordenados:
+        tiempo_climax = (bloque["inicio"] + bloque["fin"]) / 2.0
+
+        # Verificar distancia mínima con los clímax previamente seleccionados
+        separacion_suficiente = True
+        for sel in momentos_seleccionados:
+            if abs(tiempo_climax - sel["tiempo_climax"]) < distancia_minima_segundos:
+                separacion_suficiente = False
+                break
+
+        if not separacion_suficiente:
+            continue
+
+        # Calcular ventana de tiempo alrededor del clímax (40% antes para contexto y 60% jugada/reacción)
+        tiempo_previo = duracion_short_segundos * 0.40
+        inicio_ventana = max(0.0, tiempo_climax - tiempo_previo)
+        fin_ventana = min(duracion_total, inicio_ventana + duracion_short_segundos)
+
+        # Si topa con el final del metraje, reajustar hacia atrás
+        if fin_ventana >= duracion_total:
+            inicio_ventana = max(0.0, duracion_total - duracion_short_segundos)
+            fin_ventana = duracion_total
+
+        # Comprobar si solapa directamente con alguna ventana ya elegida
+        solapamiento = False
+        for sel in momentos_seleccionados:
+            if not (fin_ventana <= sel["inicio"] or inicio_ventana >= sel["fin"]):
+                solapamiento = True
+                break
+
+        if solapamiento:
+            continue
+
+        momentos_seleccionados.append({
+            "inicio": round(inicio_ventana, 2),
+            "fin": round(fin_ventana, 2),
+            "duracion": round(fin_ventana - inicio_ventana, 2),
+            "puntuacion_atencion": bloque.get("puntuacion_atencion", 50.0),
+            "tiempo_climax": round(tiempo_climax, 2)
+        })
+
+        if len(momentos_seleccionados) >= cantidad_shorts:
+            break
+
+    # Si por restricciones de distancia no se cubrió la cantidad deseada, rellenar de forma equitativa
+    if len(momentos_seleccionados) < cantidad_shorts:
+        intervalo_paso = duracion_total / (cantidad_shorts + 1)
+        for i in range(1, cantidad_shorts + 1):
+            if len(momentos_seleccionados) >= cantidad_shorts:
+                break
+            t_centro = i * intervalo_paso
+            t_ini = max(0.0, t_centro - (duracion_short_segundos / 2.0))
+            t_fin = min(duracion_total, t_ini + duracion_short_segundos)
+
+            # Verificar solapamiento
+            if not any(not (t_fin <= s["inicio"] or t_ini >= s["fin"]) for s in momentos_seleccionados):
+                momentos_seleccionados.append({
+                    "inicio": round(t_ini, 2),
+                    "fin": round(t_fin, 2),
+                    "duracion": round(t_fin - t_ini, 2),
+                    "puntuacion_atencion": 60.0,
+                    "tiempo_climax": round(t_centro, 2)
+                })
+
+    # Ordenar cronológicamente por tiempo de inicio para orden natural en la partida
+    momentos_seleccionados.sort(key=lambda m: m["inicio"])
+
+    # Asignar índices y descripciones limpias
+    for idx, item in enumerate(momentos_seleccionados, start=1):
+        item["indice"] = idx
+        minutos = int(item["inicio"] // 60)
+        segundos = int(item["inicio"] % 60)
+        item["descripcion"] = f"Short {idx}: Minuto {minutos:02d}:{segundos:02d} (Puntaje: {item['puntuacion_atencion']})"
+
+    return momentos_seleccionados
+

@@ -60,12 +60,12 @@
         <div class="separador-paso"></div>
         <div class="paso" id="indicador-paso-2">
           <span class="numero-paso">2</span>
-          <span class="nombre-paso">Elegir Plantilla</span>
+          <span class="nombre-paso">Modo de Edición</span>
         </div>
         <div class="separador-paso"></div>
         <div class="paso" id="indicador-paso-3">
           <span class="numero-paso">3</span>
-          <span class="nombre-paso">Ajustar Parámetros</span>
+          <span class="nombre-paso">Personalizar</span>
         </div>
         <div class="separador-paso"></div>
         <div class="paso" id="indicador-paso-4">
@@ -118,18 +118,96 @@
           </div>
         </section>
 
-        <!-- Tarjeta 2: Selección de Plantilla -->
-        <section class="tarjeta-panel" id="seccion-plantillas">
+        <!-- Tarjeta 2: Selector de Modo de Edición -->
+        <section class="tarjeta-panel" id="seccion-modo">
           <div class="cabecera-tarjeta">
             <h2 class="subtitulo-seccion">
               <span class="numero-tarjeta">2</span>
-              Plantilla de Edición
+              Modo de Edición
+            </h2>
+            <span class="etiqueta-ayuda">¿Qué deseas crear?</span>
+          </div>
+
+          <div class="grid-modos-edicion">
+            <div class="tarjeta-modo seleccionada" data-modo="shorts" id="modo-shorts">
+              <div class="icono-modo">🎬</div>
+              <div class="cuerpo-modo">
+                <div class="encabezado-modo">
+                  <span class="nombre-modo">Generar YouTube Shorts</span>
+                  <span class="badge-recomendado">Recomendado</span>
+                </div>
+                <p class="descripcion-modo">Analiza todo el video largo, extrae los momentos cumbre más épicos y genera varios Shorts con subtítulos dinámicos.</p>
+              </div>
+            </div>
+
+            <div class="tarjeta-modo" data-modo="video_completo" id="modo-video-completo">
+              <div class="icono-modo">📹</div>
+              <div class="cuerpo-modo">
+                <div class="encabezado-modo">
+                  <span class="nombre-modo">Video Completo Continuo</span>
+                </div>
+                <p class="descripcion-modo">Conserva toda la partida de principio a fin eliminando pausas y silencios largos sin perder el hilo.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Ajustes específicos de Shorts (visibles en modo shorts) -->
+          <div class="panel-ajustes-shorts" id="panel-ajustes-shorts">
+            <h3 class="titulo-subgrupo">Ajustes de YouTube Shorts</h3>
+            
+            <div class="fila-ajustes-shorts">
+              <div class="campo-opciones-grupo">
+                <label class="etiqueta-campo">Cantidad de Shorts:</label>
+                <div class="grupo-botones-seleccion" id="selector-cantidad-shorts">
+                  <button type="button" class="btn-opcion" data-cantidad="2">2 Shorts</button>
+                  <button type="button" class="btn-opcion activo" data-cantidad="3">3 Shorts</button>
+                  <button type="button" class="btn-opcion" data-cantidad="5">5 Shorts</button>
+                </div>
+              </div>
+
+              <div class="campo-opciones-grupo">
+                <label class="etiqueta-campo">Duración aprox. por Short:</label>
+                <div class="grupo-botones-seleccion" id="selector-duracion-shorts">
+                  <button type="button" class="btn-opcion" data-duracion="30">30s</button>
+                  <button type="button" class="btn-opcion activo" data-duracion="40">40s</button>
+                  <button type="button" class="btn-opcion" data-duracion="55">55s</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="campo-opciones-grupo margen-top-sm">
+              <label class="etiqueta-campo">Formato de Pantalla:</label>
+              <div class="grid-formatos-pantalla">
+                <div class="tarjeta-formato activo" data-formato="vertical" id="formato-vertical">
+                  <span class="icono-formato">📱</span>
+                  <div>
+                    <strong>Vertical 9:16</strong>
+                    <p>Fondo blur + acción centrada (Shorts, TikTok, Reels)</p>
+                  </div>
+                </div>
+                <div class="tarjeta-formato" data-formato="horizontal" id="formato-horizontal">
+                  <span class="icono-formato">🖥️</span>
+                  <div>
+                    <strong>Panorámico 16:9</strong>
+                    <p>Relación estándar horizontal original</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Tarjeta 3: Selección de Plantilla -->
+        <section class="tarjeta-panel" id="seccion-plantillas">
+          <div class="cabecera-tarjeta">
+            <h2 class="subtitulo-seccion">
+              <span class="numero-tarjeta">3</span>
+              Plantilla y Estilo
             </h2>
             <span class="etiqueta-ayuda">Define el estilo y ritmo</span>
           </div>
 
           <div class="grid-plantillas" id="contenedor-plantillas">
-            <!-- Cargadas dinámicamente desde API o configuradas por defecto -->
             <div class="tarjeta-plantilla seleccionada" data-plantilla="shooters_highlights" id="plantilla-shooters">
               <div class="icono-plantilla">⚡</div>
               <div class="cuerpo-plantilla">
@@ -142,6 +220,7 @@
                   <span>Valorant</span>
                   <span>CoD</span>
                   <span>Fortnite</span>
+                  <span>LoL</span>
                 </div>
               </div>
             </div>
@@ -180,11 +259,11 @@
           </div>
         </section>
 
-        <!-- Tarjeta 3: Ajustes Avanzados -->
+        <!-- Tarjeta 4: Ajustes Avanzados -->
         <section class="tarjeta-panel" id="seccion-ajustes">
           <div class="cabecera-tarjeta">
             <h2 class="subtitulo-seccion">
-              <span class="numero-tarjeta">3</span>
+              <span class="numero-tarjeta">4</span>
               Ajustes de Detección y Renderizado
             </h2>
             <button type="button" class="boton-texto" id="boton-restablecer-ajustes">Restablecer</button>
@@ -192,7 +271,7 @@
 
           <div class="formulario-ajustes">
             <!-- Slider Umbral de Silencio -->
-            <div class="campo-slider">
+            <div class="campo-slider" id="contenedor-slider-silencio">
               <div class="etiqueta-slider">
                 <span>Sensibilidad de Silencio (dB)</span>
                 <span class="valor-slider" id="valor-umbral-silencio">-28 dB</span>
@@ -202,7 +281,7 @@
             </div>
 
             <!-- Slider Duración Mínima de Silencio -->
-            <div class="campo-slider">
+            <div class="campo-slider" id="contenedor-slider-duracion">
               <div class="etiqueta-slider">
                 <span>Duración mínima de pausa</span>
                 <span class="valor-slider" id="valor-duracion-silencio">0.35 s</span>
@@ -214,15 +293,15 @@
             <!-- Casillas de verificación de características avanzadas -->
             <div class="grid-interruptores">
               <label class="interruptor-etiqueta">
-                <input type="checkbox" id="check-zooms-dinamicos" checked class="input-interruptor">
+                <input type="checkbox" id="check-subtitulos-ia" checked class="input-interruptor">
                 <span class="palanca"></span>
-                <span class="texto-interruptor">Zooms dinámicos en acción (OpenCV)</span>
+                <span class="texto-interruptor">Subtítulos automáticos dinámicos (Whisper IA)</span>
               </label>
 
               <label class="interruptor-etiqueta">
-                <input type="checkbox" id="check-subtitulos-ia" checked class="input-interruptor">
+                <input type="checkbox" id="check-zooms-dinamicos" checked class="input-interruptor">
                 <span class="palanca"></span>
-                <span class="texto-interruptor">Subtítulos automáticos (Whisper)</span>
+                <span class="texto-interruptor">Zooms dinámicos en acción (OpenCV)</span>
               </label>
 
               <label class="interruptor-etiqueta">
@@ -249,13 +328,13 @@
         <div class="tarjeta-accion-destacada">
           <div class="info-accion">
             <span class="etiqueta-resumen">Listo para procesar</span>
-            <span class="titulo-accion" id="resumen-modo">Plantilla: Shooters / Highlights</span>
+            <span class="titulo-accion" id="resumen-modo">Modo: YouTube Shorts (3 clips verticales)</span>
           </div>
           <button type="button" class="boton-primario-grande" id="boton-iniciar-edicion">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
               <polygon points="5 3 19 12 5 21 5 3"></polygon>
             </svg>
-            <span>Iniciar Edición Automática</span>
+            <span id="texto-boton-iniciar">Iniciar Generación de Shorts</span>
           </button>
         </div>
 
@@ -287,7 +366,7 @@
             </div>
             <div class="etapa-item" id="etapa-montaje">
               <span class="circulo-etapa">4</span>
-              <span class="nombre-etapa">Línea de Tiempo & Montaje</span>
+              <span class="nombre-etapa">Selección de Momentos Cumbre</span>
             </div>
             <div class="etapa-item" id="etapa-render">
               <span class="circulo-etapa">5</span>
@@ -315,12 +394,21 @@
           <div class="contenedor-reproductor" id="contenedor-reproductor">
             <div class="marcador-posicion-video" id="placeholder-reproductor">
               <div class="icono-reproductor-placeholder">▶</div>
-              <p>El reproductor se activará cuando concluya el renderizado</p>
+              <p id="texto-placeholder-reproductor">El reproductor se activará cuando concluya el renderizado</p>
             </div>
             <video id="reproductor-video-final" controls class="reproductor-video oculto"></video>
           </div>
 
-          <!-- Métricas del video editado -->
+          <!-- Galería de Shorts generados (Modo Shorts) -->
+          <div class="seccion-shorts-generados oculto" id="seccion-shorts-generados">
+            <h3 class="subtitulo-galeria">Shorts Generados (<span id="conteo-shorts-generados">0</span>)</h3>
+            <p class="descripcion-galeria">Haz clic en cualquier Short para verlo en el reproductor o descargarlo individualmente:</p>
+            <div class="lista-shorts-generados" id="contenedor-tarjetas-shorts">
+              <!-- Renderizado dinámicamente -->
+            </div>
+          </div>
+
+          <!-- Métricas del video editado (Modo Video Completo) -->
           <div class="grid-metricas oculto" id="grid-metricas-resultado">
             <div class="caja-metrica">
               <span class="etiqueta-metrica">Tiempo Original</span>
