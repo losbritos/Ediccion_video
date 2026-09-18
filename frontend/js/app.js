@@ -3,7 +3,13 @@
  * Gestiona eventos de interfaz, selección de plantillas, carga de archivos y ciclo de renderizado.
  */
 
-import { verificarEstadoServidor, obtenerPlantillasDisponibles } from './api.js';
+import {
+  verificarEstadoServidor,
+  obtenerPlantillasDisponibles,
+  subirVideoLocal,
+  iniciarProcesamiento,
+  consultarProgresoTarea
+} from './api.js';
 
 // Estado global de la aplicación cliente
 const estadoApp = {
@@ -263,11 +269,20 @@ async function iniciarFlujoEdicion() {
 
   if (estadoApp.servidorConectado) {
     try {
-      // 1. Subida al backend
+      // 1. Subida al backend con reporte visual de progreso
       marcarEtapaActiva('audio');
-      agregarLogConsola('Enviando archivo de video al backend local...');
-      const datosSubida = await subirVideoLocal(estadoApp.archivoSeleccionado);
-      agregarLogConsola(`Video registrado con ID: ${datosSubida.id_video} (${datosSubida.tamano_mb} MB)`);
+      agregarLogConsola(`Transfiriendo video al motor local (${formatearTamanoBytes(estadoApp.archivoSeleccionado.size)})...`);
+
+      const datosSubida = await subirVideoLocal(estadoApp.archivoSeleccionado, (porcentajeSubida) => {
+        // Reflejar la subida en la interfaz
+        elementos.textoEstadoServidor.textContent = `Subiendo: ${porcentajeSubida}%`;
+        if (porcentajeSubida % 25 === 0 && porcentajeSubida > 0 && porcentajeSubida < 100) {
+          agregarLogConsola(`Progreso de carga del archivo: ${porcentajeSubida}%`);
+        }
+      });
+
+      elementos.textoEstadoServidor.textContent = 'Backend Conectado (Local)';
+      agregarLogConsola(`Video registrado con éxito: "${datosSubida.nombre}" (ID: ${datosSubida.id_video})`);
 
       // 2. Iniciar tarea
       const datosTarea = await iniciarProcesamiento(

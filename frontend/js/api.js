@@ -54,24 +54,43 @@ export async function obtenerPlantillasDisponibles() {
 }
 
 /**
- * Envía un archivo de video al backend para su análisis local.
+ * Envía un archivo de video al backend para su análisis local con seguimiento de subida.
  * @param {File} archivoVideo - Objeto File seleccionado por el usuario.
+ * @param {Function} [callbackProgresoSubida] - Función opcional que recibe el porcentaje (0-100).
  * @returns {Promise<object>}
  */
-export async function subirVideoLocal(archivoVideo) {
-  const formulario = new FormData();
-  formulario.append('archivo', archivoVideo);
+export function subirVideoLocal(archivoVideo, callbackProgresoSubida) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const formulario = new FormData();
+    formulario.append('archivo', archivoVideo);
 
-  const respuesta = await fetch(`${URL_BASE_API}/subir`, {
-    method: 'POST',
-    body: formulario
+    if (xhr.upload && callbackProgresoSubida) {
+      xhr.upload.onprogress = (evento) => {
+        if (evento.lengthComputable) {
+          const porcentaje = Math.round((evento.loaded / evento.total) * 100);
+          callbackProgresoSubida(porcentaje);
+        }
+      };
+    }
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const respuesta = JSON.parse(xhr.responseText);
+          resolve(respuesta);
+        } catch (e) {
+          reject(new Error('Respuesta no válida del servidor'));
+        }
+      } else {
+        reject(new Error(`El servidor respondió con código ${xhr.status}`));
+      }
+    };
+
+    xhr.onerror = () => reject(new Error('Fallo de red al enviar el archivo al servidor local'));
+    xhr.open('POST', `${URL_BASE_API}/subir`);
+    xhr.send(formulario);
   });
-
-  if (!respuesta.ok) {
-    throw new Error('Error al enviar el video al motor local');
-  }
-
-  return await respuesta.json();
 }
 
 /**
