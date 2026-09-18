@@ -16,6 +16,7 @@ import uuid
 from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from scipy.io import wavfile
 
@@ -231,6 +232,13 @@ def descargar_video_procesado(id_tarea: str):
         media_type="video/mp4",
         filename=Path(ruta_archivo).name
     )
+
+
+# Servir la interfaz web local directamente en http://127.0.0.1:8000/
+RUTA_FRONTEND = RUTA_BASE_BACKEND.parent / "frontend"
+if RUTA_FRONTEND.exists():
+    aplicacion.mount("/", StaticFiles(directory=str(RUTA_FRONTEND), html=True), name="frontend")
+
 
 
 def procesar_video_cli(

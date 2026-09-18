@@ -3,7 +3,9 @@
  * Provee funciones asíncronas para consultar estado, obtener plantillas y orquestar tareas.
  */
 
-const URL_BASE_API = 'http://127.0.0.1:8000/api';
+const URL_BASE_API = (typeof window !== 'undefined' && window.location.protocol.startsWith('http'))
+  ? `${window.location.origin}/api`
+  : 'http://127.0.0.1:8000/api';
 
 /**
  * Consulta el estado de salud y conectividad del servidor local.
