@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AutoCut Studio - Edición Automática de Video Local para YouTube</title>
+  <meta name="description" content="Aplicación local de edición automática de video para YouTube y Gaming. Recorta silencios, detecta acción y genera subtítulos con IA.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="tema-oscuro">
+  <!-- Fondo con efecto de resplandor ambiental -->
+  <div class="resplandor-ambiental resplandor-cyan"></div>
+  <div class="resplandor-ambiental resplandor-purpura"></div>
+
+  <!-- Barra de Navegación Superior -->
+  <header class="cabecera-principal">
+    <div class="contenedor-cabecera">
+      <div class="logo-area">
+        <div class="icono-logo">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="23 7 16 12 23 17 23 7"></polygon>
+            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+          </svg>
+        </div>
+        <div class="texto-logo">
+          <span class="titulo-marca">AutoCut<span class="acento-texto">Studio</span></span>
+          <span class="etiqueta-version">100% Local</span>
+        </div>
+      </div>
+
+      <div class="barra-acciones-cabecera">
+        <div class="insignia-estado" id="insignia-servidor">
+          <span class="punto-estado"></span>
+          <span id="texto-estado-servidor">Conectando con Backend...</span>
+        </div>
+        <a href="#seccion-ajustes" class="enlace-guia">Ajustes</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Contenido Principal -->
+  <main class="contenedor-principal">
+    
+    <!-- Sección de Introducción y Flujo -->
+    <section class="seccion-hero">
+      <h1 class="titulo-principal">Edición Automática de Video impulsada por IA Local</h1>
+      <p class="descripcion-principal">
+        Optimizado para creadores de YouTube y Gaming. Recorta silencios al instante, resalta los momentos cumbre con visión artificial y genera subtítulos sin subir nada a la nube.
+      </p>
+
+      <!-- Pasos del flujo de trabajo -->
+      <div class="indicador-pasos">
+        <div class="paso activo" id="indicador-paso-1">
+          <span class="numero-paso">1</span>
+          <span class="nombre-paso">Seleccionar Video</span>
+        </div>
+        <div class="separador-paso"></div>
+        <div class="paso" id="indicador-paso-2">
+          <span class="numero-paso">2</span>
+          <span class="nombre-paso">Elegir Plantilla</span>
+        </div>
+        <div class="separador-paso"></div>
+        <div class="paso" id="indicador-paso-3">
+          <span class="numero-paso">3</span>
+          <span class="nombre-paso">Ajustar Parámetros</span>
+        </div>
+        <div class="separador-paso"></div>
+        <div class="paso" id="indicador-paso-4">
+          <span class="numero-paso">4</span>
+          <span class="nombre-paso">Renderizar</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Grid de Trabajo -->
+    <div class="grid-trabajo">
+
+      <!-- Columna Izquierda: Entrada y Configuración -->
+      <div class="columna-configuracion">
+        
+        <!-- Tarjeta 1: Carga de Video -->
+        <section class="tarjeta-panel" id="seccion-carga">
+          <div class="cabecera-tarjeta">
+            <h2 class="subtitulo-seccion">
+              <span class="numero-tarjeta">1</span>
+              Archivo de Video
+            </h2>
+            <span class="badge-formato">MP4, MKV, MOV</span>
+          </div>
+
+          <div class="zona-arrastre" id="zona-soltar-archivo">
+            <input type="file" id="entrada-archivo-video" accept="video/mp4,video/mkv,video/quicktime,video/webm" class="input-archivo-oculto">
+            <div class="contenido-zona-arrastre">
+              <div class="icono-arrastre">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="17 8 12 3 7 8"></polyline>
+                  <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+              </div>
+              <p class="texto-arrastre-principal">Arrastra y suelta tu video aquí</p>
+              <p class="texto-arrastre-secundario">o pulsa para explorar archivos en tu equipo</p>
+              <button type="button" class="boton-secundario" id="boton-seleccionar-video">Examinar archivo</button>
+            </div>
+          </div>
+
+          <!-- Información de archivo cargado -->
+          <div class="tarjeta-archivo-cargado oculto" id="tarjeta-archivo-cargado">
+            <div class="icono-archivo-video">🎬</div>
+            <div class="detalles-archivo">
+              <span class="nombre-archivo" id="nombre-archivo-seleccionado">mi_gameplay_largo.mp4</span>
+              <span class="meta-archivo" id="tamano-archivo-seleccionado">1.42 GB</span>
+            </div>
+            <button type="button" class="boton-icono" id="boton-quitar-video" title="Quitar archivo">✕</button>
+          </div>
+        </section>
+
+        <!-- Tarjeta 2: Selección de Plantilla -->
+        <section class="tarjeta-panel" id="seccion-plantillas">
+          <div class="cabecera-tarjeta">
+            <h2 class="subtitulo-seccion">
+              <span class="numero-tarjeta">2</span>
+              Plantilla de Edición
+            </h2>
+            <span class="etiqueta-ayuda">Define el estilo y ritmo</span>
+          </div>
+
+          <div class="grid-plantillas" id="contenedor-plantillas">
+            <!-- Cargadas dinámicamente desde API o configuradas por defecto -->
+            <div class="tarjeta-plantilla seleccionada" data-plantilla="shooters_highlights" id="plantilla-shooters">
+              <div class="icono-plantilla">⚡</div>
+              <div class="cuerpo-plantilla">
+                <div class="encabezado-plantilla">
+                  <span class="nombre-plantilla">Shooters / Highlights</span>
+                  <span class="tag-ritmo agresivo">Ultra Rápido</span>
+                </div>
+                <p class="descripcion-plantilla">Corte agresivo de pausas, zooms en kills/impacto y subtítulos coloridos para máxima retención.</p>
+                <div class="tags-juegos">
+                  <span>Valorant</span>
+                  <span>CoD</span>
+                  <span>Fortnite</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="tarjeta-plantilla" data-plantilla="gameplay_narrado" id="plantilla-gameplay">
+              <div class="icono-plantilla">🎮</div>
+              <div class="cuerpo-plantilla">
+                <div class="encabezado-plantilla">
+                  <span class="nombre-plantilla">Let's Play Narrado</span>
+                  <span class="tag-ritmo moderado">Fluido</span>
+                </div>
+                <p class="descripcion-plantilla">Mantiene pausas de conversación naturales, música de fondo sutil con audio ducking.</p>
+                <div class="tags-juegos">
+                  <span>Minecraft</span>
+                  <span>Elden Ring</span>
+                  <span>GTA</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="tarjeta-plantilla" data-plantilla="tutorial_educativo" id="plantilla-tutorial">
+              <div class="icono-plantilla">📚</div>
+              <div class="cuerpo-plantilla">
+                <div class="encabezado-plantilla">
+                  <span class="nombre-plantilla">Tutorial / Educativo</span>
+                  <span class="tag-ritmo suave">Limpio</span>
+                </div>
+                <p class="descripcion-plantilla">Subtítulos claros, transiciones sutiles y pausas adecuadas para explicaciones pedagógicas.</p>
+                <div class="tags-juegos">
+                  <span>General</span>
+                  <span>Software</span>
+                  <span>Reviews</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Tarjeta 3: Ajustes Avanzados -->
+        <section class="tarjeta-panel" id="seccion-ajustes">
+          <div class="cabecera-tarjeta">
+            <h2 class="subtitulo-seccion">
+              <span class="numero-tarjeta">3</span>
+              Ajustes de Detección y Renderizado
+            </h2>
+            <button type="button" class="boton-texto" id="boton-restablecer-ajustes">Restablecer</button>
+          </div>
+
+          <div class="formulario-ajustes">
+            <!-- Slider Umbral de Silencio -->
+            <div class="campo-slider">
+              <div class="etiqueta-slider">
+                <span>Sensibilidad de Silencio (dB)</span>
+                <span class="valor-slider" id="valor-umbral-silencio">-28 dB</span>
+              </div>
+              <input type="range" id="slider-umbral-silencio" min="-45" max="-15" step="1" value="-28" class="control-rango">
+              <p class="pista-slider">Valores más altos recortan más pausas; valores más bajos conservan respiraciones o susurros.</p>
+            </div>
+
+            <!-- Slider Duración Mínima de Silencio -->
+            <div class="campo-slider">
+              <div class="etiqueta-slider">
+                <span>Duración mínima de pausa</span>
+                <span class="valor-slider" id="valor-duracion-silencio">0.35 s</span>
+              </div>
+              <input type="range" id="slider-duracion-silencio" min="0.1" max="1.5" step="0.05" value="0.35" class="control-rango">
+              <p class="pista-slider">Tiempo mínimo de silencio requerido para activar un corte.</p>
+            </div>
+
+            <!-- Casillas de verificación de características avanzadas -->
+            <div class="grid-interruptores">
+              <label class="interruptor-etiqueta">
+                <input type="checkbox" id="check-zooms-dinamicos" checked class="input-interruptor">
+                <span class="palanca"></span>
+                <span class="texto-interruptor">Zooms dinámicos en acción (OpenCV)</span>
+              </label>
+
+              <label class="interruptor-etiqueta">
+                <input type="checkbox" id="check-subtitulos-ia" checked class="input-interruptor">
+                <span class="palanca"></span>
+                <span class="texto-interruptor">Subtítulos automáticos (Whisper)</span>
+              </label>
+
+              <label class="interruptor-etiqueta">
+                <input type="checkbox" id="check-audio-ducking" checked class="input-interruptor">
+                <span class="palanca"></span>
+                <span class="texto-interruptor">Audio Ducking para música de fondo</span>
+              </label>
+
+              <label class="interruptor-etiqueta">
+                <input type="checkbox" id="check-aceleracion-gpu" checked class="input-interruptor">
+                <span class="palanca"></span>
+                <span class="texto-interruptor">Aceleración por GPU (NVIDIA NVENC)</span>
+              </label>
+            </div>
+          </div>
+        </section>
+
+      </div>
+
+      <!-- Columna Derecha: Consola, Progreso y Previsualización -->
+      <div class="columna-resultado">
+        
+        <!-- Tarjeta Acción de Inicio -->
+        <div class="tarjeta-accion-destacada">
+          <div class="info-accion">
+            <span class="etiqueta-resumen">Listo para procesar</span>
+            <span class="titulo-accion" id="resumen-modo">Plantilla: Shooters / Highlights</span>
+          </div>
+          <button type="button" class="boton-primario-grande" id="boton-iniciar-edicion">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+            <span>Iniciar Edición Automática</span>
+          </button>
+        </div>
+
+        <!-- Tarjeta de Progreso en Tiempo Real -->
+        <section class="tarjeta-panel" id="seccion-progreso">
+          <div class="cabecera-tarjeta">
+            <h2 class="subtitulo-seccion">Progreso del Pipeline</h2>
+            <span class="porcentaje-progreso" id="etiqueta-porcentaje">0%</span>
+          </div>
+
+          <!-- Barra de progreso -->
+          <div class="contenedor-barra-progreso">
+            <div class="barra-progreso-relleno" id="barra-progreso-relleno" style="width: 0%;"></div>
+          </div>
+
+          <!-- Etapas del pipeline -->
+          <div class="etapas-pipeline">
+            <div class="etapa-item" id="etapa-audio">
+              <span class="circulo-etapa">1</span>
+              <span class="nombre-etapa">Análisis de Audio (Silencios & Picos)</span>
+            </div>
+            <div class="etapa-item" id="etapa-vision">
+              <span class="circulo-etapa">2</span>
+              <span class="nombre-etapa">Detección Visual de Acción</span>
+            </div>
+            <div class="etapa-item" id="etapa-whisper">
+              <span class="circulo-etapa">3</span>
+              <span class="nombre-etapa">Transcripción & Subtítulos IA</span>
+            </div>
+            <div class="etapa-item" id="etapa-montaje">
+              <span class="circulo-etapa">4</span>
+              <span class="nombre-etapa">Línea de Tiempo & Montaje</span>
+            </div>
+            <div class="etapa-item" id="etapa-render">
+              <span class="circulo-etapa">5</span>
+              <span class="nombre-etapa">Renderizado Final (FFmpeg)</span>
+            </div>
+          </div>
+
+          <!-- Consola de registros / logs -->
+          <div class="consola-logs">
+            <div class="cabecera-consola">
+              <span>Terminal de Operaciones</span>
+              <button type="button" class="boton-limpiar-consola" id="boton-limpiar-logs">Limpiar</button>
+            </div>
+            <pre class="cuerpo-consola" id="cuerpo-consola-logs">> Esperando archivo de video para comenzar...</pre>
+          </div>
+        </section>
+
+        <!-- Tarjeta de Previsualización y Descarga -->
+        <section class="tarjeta-panel" id="seccion-previsualizacion">
+          <div class="cabecera-tarjeta">
+            <h2 class="subtitulo-seccion">Resultado y Previsualización</h2>
+            <span class="insignia-listo oculto" id="badge-video-listo">Listo</span>
+          </div>
+
+          <div class="contenedor-reproductor" id="contenedor-reproductor">
+            <div class="marcador-posicion-video" id="placeholder-reproductor">
+              <div class="icono-reproductor-placeholder">▶</div>
+              <p>El reproductor se activará cuando concluya el renderizado</p>
+            </div>
+            <video id="reproductor-video-final" controls class="reproductor-video oculto"></video>
+          </div>
+
+          <!-- Métricas del video editado -->
+          <div class="grid-metricas oculto" id="grid-metricas-resultado">
+            <div class="caja-metrica">
+              <span class="etiqueta-metrica">Tiempo Original</span>
+              <span class="valor-metrica" id="metrica-duracion-original">--:--</span>
+            </div>
+            <div class="caja-metrica destacada">
+              <span class="etiqueta-metrica">Tiempo Editado</span>
+              <span class="valor-metrica" id="metrica-duracion-editado">--:--</span>
+            </div>
+            <div class="caja-metrica">
+              <span class="etiqueta-metrica">Tiempo Ahorrado</span>
+              <span class="valor-metrica" id="metrica-ahorro-tiempo">--%</span>
+            </div>
+            <div class="caja-metrica">
+              <span class="etiqueta-metrica">Cortes Aplicados</span>
+              <span class="valor-metrica" id="metrica-cortes">0</span>
+            </div>
+          </div>
+
+          <div class="acciones-exportacion oculto" id="acciones-exportacion">
+            <a href="#" class="boton-descargar" id="enlace-descarga-video" download="video_editado.mp4">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              <span>Descargar Video Final</span>
+            </a>
+          </div>
+        </section>
+
+      </div>
+    </div>
+  </main>
+
+  <footer class="pie-pagina">
+    <div class="contenedor-pie">
+      <p>AutoCut Studio • Procesamiento 100% Local • Diseñado para creadores de contenido</p>
+    </div>
+  </footer>
+
+  <!-- Scripts Modulares -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

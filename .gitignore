@@ -1,0 +1,30 @@
+# Entornos virtuales
+venv/
+.venv/
+env/
+
+# Python Cache y Compilación
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Pruebas y Cobertura
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Archivos de Medios Temporales y Salidas de Video
+*.mp4
+*.mkv
+*.mov
+*.wav
+*.tmp
+temp/
+assets/musica_temp/
+salidas/
+
+# IDEs y Editores
+.vscode/
+.idea/
+*.swp

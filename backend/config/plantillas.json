@@ -1,0 +1,76 @@
+{
+  "plantillas": [
+    {
+      "id": "shooters_highlights",
+      "nombre": "Gaming: Shooters y Highlights",
+      "descripcion": "Ritmo frenético optimizado para alta retención. Elimina cualquier silencio, zooms dinámicos en momentos clave y subtítulos llamativos.",
+      "juegos_recomendados": ["Valorant", "CS:GO", "Call of Duty", "Fortnite", "Apex Legends"],
+      "ajustes_audio": {
+        "umbral_silencio_db": -28.0,
+        "duracion_minima_silencio_segundos": 0.35,
+        "margen_conservacion_corte_segundos": 0.08,
+        "audio_ducking_musica_db": -20.0
+      },
+      "ajustes_video": {
+        "sensibilidad_movimiento": 0.7,
+        "activar_zooms_dinamicos": true,
+        "factor_zoom": 1.18,
+        "duracion_zoom_segundos": 1.2
+      },
+      "subtitulos": {
+        "estilo": "animado_palabra_por_palabra",
+        "color_primario": "#FFEA00",
+        "color_resaltado": "#FF0055",
+        "tamano_fuente": 44
+      }
+    },
+    {
+      "id": "gameplay_narrado",
+      "nombre": "Gaming: Let's Play y Gameplay Narrado",
+      "descripcion": "Cortes equilibrados que preservan pausas naturales de conversación y momentos de reflexión con música de fondo sutil.",
+      "juegos_recomendados": ["Minecraft", "Elden Ring", "Cyberpunk 2077", "GTA V", "Zelda"],
+      "ajustes_audio": {
+        "umbral_silencio_db": -32.0,
+        "duracion_minima_silencio_segundos": 0.8,
+        "margen_conservacion_corte_segundos": 0.25,
+        "audio_ducking_musica_db": -24.0
+      },
+      "ajustes_video": {
+        "sensibilidad_movimiento": 0.5,
+        "activar_zooms_dinamicos": true,
+        "factor_zoom": 1.10,
+        "duracion_zoom_segundos": 2.0
+      },
+      "subtitulos": {
+        "estilo": "linea_completa",
+        "color_primario": "#FFFFFF",
+        "color_resaltado": "#00E5FF",
+        "tamano_fuente": 36
+      }
+    },
+    {
+      "id": "tutorial_educativo",
+      "nombre": "Tutoriales y Contenido Educativo",
+      "descripcion": "Enfoque en claridad y ritmo fluido. Subtítulos limpios y legibles, transiciones suaves y detección de capítulos.",
+      "juegos_recomendados": ["General", "Programación", "Guías de Software", "Reviews"],
+      "ajustes_audio": {
+        "umbral_silencio_db": -34.0,
+        "duracion_minima_silencio_segundos": 0.7,
+        "margen_conservacion_corte_segundos": 0.2,
+        "audio_ducking_musica_db": -26.0
+      },
+      "ajustes_video": {
+        "sensibilidad_movimiento": 0.3,
+        "activar_zooms_dinamicos": false,
+        "factor_zoom": 1.0,
+        "duracion_zoom_segundos": 0.0
+      },
+      "subtitulos": {
+        "estilo": "clasico_inferior",
+        "color_primario": "#F0F0F0",
+        "color_resaltado": "#00FF88",
+        "tamano_fuente": 32
+      }
+    }
+  ]
+}

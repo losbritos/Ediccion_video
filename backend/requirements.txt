@@ -1,0 +1,22 @@
+# Dependencias principales del Backend (Python 3.10+)
+
+# API Web y Servidor Asíncrono
+fastapi>=0.110.0
+uvicorn[standard]>=0.28.0
+pydantic>=2.6.0
+python-multipart>=0.0.9
+
+# Análisis y Procesamiento de Audio
+pydub>=0.25.1
+scipy>=1.12.0
+numpy>=1.26.0
+
+# Visión por Computadora
+opencv-python>=4.9.0.80
+
+# Transcripción IA Local (Fase 2)
+# faster-whisper>=1.0.0
+
+# Suite de Pruebas Automatizadas
+pytest>=8.0.0
+httpx>=0.27.0
