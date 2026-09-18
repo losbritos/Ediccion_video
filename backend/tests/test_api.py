@@ -10,7 +10,7 @@ RUTA_ACTUAL = Path(__file__).resolve().parent
 RUTA_BACKEND = RUTA_ACTUAL.parent
 sys.path.append(str(RUTA_BACKEND))
 
-from main import cargar_plantillas_configuradas  # noqa: E402
+from main import listar_plantillas_disponibles  # noqa: E402
 
 
 def test_carga_plantillas_retorna_lista_valida():
@@ -18,7 +18,7 @@ def test_carga_plantillas_retorna_lista_valida():
     Verifica que la función de carga de plantillas retorne la lista configurada
     con los identificadores requeridos.
     """
-    datos = cargar_plantillas_configuradas()
+    datos = listar_plantillas_disponibles()
     assert "plantillas" in datos
     assert isinstance(datos["plantillas"], list)
     assert len(datos["plantillas"]) >= 3
@@ -33,7 +33,7 @@ def test_estructura_ajustes_plantilla_shooters():
     """
     Verifica que la plantilla de Shooters contenga los ajustes obligatorios de audio y video.
     """
-    datos = cargar_plantillas_configuradas()
+    datos = listar_plantillas_disponibles()
     plantilla_shooter = next(
         p for p in datos["plantillas"] if p["id"] == "shooters_highlights"
     )

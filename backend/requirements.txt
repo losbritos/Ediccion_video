@@ -15,7 +15,7 @@ numpy>=1.26.0
 opencv-python>=4.9.0.80
 
 # Transcripción IA Local (Fase 2)
-# faster-whisper>=1.0.0
+faster-whisper>=1.0.0
 
 # Suite de Pruebas Automatizadas
 pytest>=8.0.0

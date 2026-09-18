@@ -260,72 +260,152 @@ async function iniciarFlujoEdicion() {
   agregarLogConsola('==============================================');
   agregarLogConsola(`Iniciando AutoCut Studio en "${estadoApp.archivoSeleccionado.name}"`);
   agregarLogConsola(`Plantilla activa: ${estadoApp.idPlantillaSeleccionada}`);
-  agregarLogConsola(`Umbral de silencio: ${elementos.sliderUmbral.value} dB | Duración mín: ${elementos.sliderDuracion.value} s`);
 
-  // Etapa 1: Análisis de Audio
-  marcarEtapaActiva('audio');
-  agregarLogConsola('[1/5] Extrayendo pista de audio WAV (16kHz PCM)...');
-  await simularRetardo(1200);
-  agregarLogConsola('[1/5] Analizando decibelios ($dB$) y detectando pausas y silencios...');
-  await simularRetardo(1400);
-  actualizarBarraProgreso(25);
-  marcarEtapaCompletada('audio');
+  if (estadoApp.servidorConectado) {
+    try {
+      // 1. Subida al backend
+      marcarEtapaActiva('audio');
+      agregarLogConsola('Enviando archivo de video al backend local...');
+      const datosSubida = await subirVideoLocal(estadoApp.archivoSeleccionado);
+      agregarLogConsola(`Video registrado con ID: ${datosSubida.id_video} (${datosSubida.tamano_mb} MB)`);
 
-  // Etapa 2: Detección Visual
-  marcarEtapaActiva('vision');
-  agregarLogConsola('[2/5] Muestreando keyframes con OpenCV...');
-  await simularRetardo(1300);
-  agregarLogConsola('[2/5] Identificando picos de acción y movimiento rápido...');
-  await simularRetardo(1100);
-  actualizarBarraProgreso(50);
-  marcarEtapaCompletada('vision');
+      // 2. Iniciar tarea
+      const datosTarea = await iniciarProcesamiento(
+        datosSubida.id_video,
+        estadoApp.idPlantillaSeleccionada,
+        {
+          ajustes_audio: {
+            umbral_silencio_db: estadoApp.ajustes.umbralSilencioDb,
+            duracion_minima_silencio_segundos: estadoApp.ajustes.duracionSilencioSeg
+          }
+        }
+      );
+      const idTarea = datosTarea.id_tarea;
+      agregarLogConsola(`Tarea encolada con ID: ${idTarea}`);
 
-  // Etapa 3: Transcripción IA Whisper
-  marcarEtapaActiva('whisper');
-  agregarLogConsola('[3/5] Ejecutando transcripción local con Faster-Whisper...');
-  await simularRetardo(1400);
-  agregarLogConsola('[3/5] Generando marcas de tiempo de palabras y subtítulos dinámicos...');
-  await simularRetardo(1200);
-  actualizarBarraProgreso(75);
-  marcarEtapaCompletada('whisper');
+      // 3. Polling de progreso
+      let terminado = false;
+      let ultimoIndiceLog = 0;
 
-  // Etapa 4: Montaje y Cortes
-  marcarEtapaActiva('montaje');
-  agregarLogConsola('[4/5] Director de Montaje calculando "Puntuación de Atención"...');
-  await simularRetardo(1100);
-  agregarLogConsola('[4/5] Ensamblando lista de decisiones de edición (EDL)...');
-  await simularRetardo(900);
-  actualizarBarraProgreso(90);
-  marcarEtapaCompletada('montaje');
+      while (!terminado) {
+        await simularRetardo(700);
+        const estadoTarea = await consultarProgresoTarea(idTarea);
 
-  // Etapa 5: Renderizado FFmpeg
-  marcarEtapaActiva('render');
-  agregarLogConsola('[5/5] Renderizando video final mediante FFmpeg...');
-  await simularRetardo(1400);
-  actualizarBarraProgreso(100);
-  marcarEtapaCompletada('render');
+        actualizarBarraProgreso(estadoTarea.progreso || 0);
 
-  // Conclusión
-  agregarLogConsola('¡Procesamiento completado con éxito!');
-  agregarLogConsola('==============================================');
+        if (estadoTarea.etapa) {
+          marcarEtapaActiva(estadoTarea.etapa);
+        }
 
-  mostrarResultadosFinales();
+        // Transmitir nuevos logs a la terminal visual
+        const nuevosLogs = estadoTarea.logs || [];
+        for (let i = ultimoIndiceLog; i < nuevosLogs.length; i++) {
+          agregarLogConsola(nuevosLogs[i]);
+        }
+        ultimoIndiceLog = nuevosLogs.length;
+
+        if (estadoTarea.estado === 'completado') {
+          terminado = true;
+          marcarEtapaCompletada('render');
+          const res = estadoTarea.resultado || {};
+
+          mostrarResultadosFinales({
+            duracionOriginal: res.duracion_original ? `${res.duracion_original}s` : '00:00',
+            duracionEditado: res.duracion_final_estimada ? `${res.duracion_final_estimada}s` : '00:00',
+            ahorro: res.ahorro_tiempo_porcentaje ? `-${res.ahorro_tiempo_porcentaje}%` : '0%',
+            cortes: res.cantidad_cortes || 0,
+            urlDescarga: `http://127.0.0.1:8000/api/descargar/${idTarea}`
+          });
+        } else if (estadoTarea.estado === 'error') {
+          throw new Error(estadoTarea.error || 'Error desconocido en el procesamiento');
+        }
+      }
+    } catch (err) {
+      agregarLogConsola(`[ERROR]: ${err.message}`);
+      alert(`Error durante el procesamiento: ${err.message}`);
+    }
+  } else {
+    // Modo demostrativo local (cuando el backend está apagado)
+    await ejecutarSimulacionDemostrativa();
+  }
+
   estadoApp.enProceso = false;
   elementos.botonIniciarEdicion.disabled = false;
 }
 
 /**
+ * Simulación visual fluida para exploración cuando el backend no está iniciado.
+ */
+async function ejecutarSimulacionDemostrativa() {
+  marcarEtapaActiva('audio');
+  agregarLogConsola('[1/5] Extrayendo pista de audio WAV (16kHz PCM)...');
+  await simularRetardo(1000);
+  agregarLogConsola('[1/5] Analizando decibelios ($dB$) y detectando pausas y silencios...');
+  await simularRetardo(1000);
+  actualizarBarraProgreso(25);
+  marcarEtapaCompletada('audio');
+
+  marcarEtapaActiva('vision');
+  agregarLogConsola('[2/5] Muestreando keyframes con OpenCV...');
+  await simularRetardo(1000);
+  actualizarBarraProgreso(50);
+  marcarEtapaCompletada('vision');
+
+  marcarEtapaActiva('whisper');
+  agregarLogConsola('[3/5] Transcripción local con Faster-Whisper y subtítulos dinámicos...');
+  await simularRetardo(1000);
+  actualizarBarraProgreso(75);
+  marcarEtapaCompletada('whisper');
+
+  marcarEtapaActiva('montaje');
+  agregarLogConsola('[4/5] Director de Montaje calculando "Puntuación de Atención"...');
+  await simularRetardo(800);
+  actualizarBarraProgreso(90);
+  marcarEtapaCompletada('montaje');
+
+  marcarEtapaActiva('render');
+  agregarLogConsola('[5/5] Renderizando video final mediante FFmpeg...');
+  await simularRetardo(1000);
+  actualizarBarraProgreso(100);
+  marcarEtapaCompletada('render');
+
+  agregarLogConsola('¡Procesamiento completado con éxito!');
+  mostrarResultadosFinales({
+    duracionOriginal: '22:45',
+    duracionEditado: '08:12',
+    ahorro: '-64%',
+    cortes: '148',
+    urlDescarga: '#'
+  });
+}
+
+/**
  * Muestra las métricas calculadas y activa la descarga del video procesado.
  */
-function mostrarResultadosFinales() {
+function mostrarResultadosFinales(datosMetricas) {
   elementos.gridMetricas.classList.remove('oculto');
   elementos.badgeListo.classList.remove('oculto');
   elementos.accionesExportacion.classList.remove('oculto');
 
-  elementos.metricaOriginal.textContent = '22:45';
-  elementos.metricaEditado.textContent = '08:12';
-  elementos.metricaAhorro.textContent = '-64%';
-  elementos.metricaCortes.textContent = '148';
+  elementos.metricaOriginal.textContent = datosMetricas.duracionOriginal;
+  elementos.metricaEditado.textContent = datosMetricas.duracionEditado;
+  elementos.metricaAhorro.textContent = datosMetricas.ahorro;
+  elementos.metricaCortes.textContent = datosMetricas.cortes;
+
+  if (datosMetricas.urlDescarga && datosMetricas.urlDescarga !== '#') {
+    const enlace = document.getElementById('enlace-descarga-video');
+    if (enlace) {
+      enlace.href = datosMetricas.urlDescarga;
+    }
+    const reproductor = document.getElementById('reproductor-video-final');
+    const placeholder = document.getElementById('placeholder-reproductor');
+    if (reproductor && placeholder) {
+      placeholder.classList.add('oculto');
+      reproductor.classList.remove('oculto');
+      reproductor.src = datosMetricas.urlDescarga;
+      reproductor.load();
+    }
+  }
 }
 
 function ocultarResultadosPrevios() {
