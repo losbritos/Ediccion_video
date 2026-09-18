@@ -27,6 +27,7 @@ from modulos.motor_edicion import (
 from modulos.generador_subtitulos import generar_subtitulos_ass_animados
 from modulos.transcriptor_ia import TranscriptorLocal
 from modulos.gestor_plantillas import GestorPlantillas
+from modulos.generador_assets import mezclar_audio_clip, inicializar_assets_predeterminados
 
 
 class DirectorMontaje:
@@ -195,13 +196,17 @@ class DirectorMontaje:
         duracion_short_segundos: float = 35.0,
         formato_vertical: bool = True,
         incluir_subtitulos: bool = True,
+        incluir_musica_fondo: bool = True,
+        incluir_zooms_impacto: bool = True,
+        incluir_efectos_memes: bool = True,
         ajustes_personalizados: Optional[Dict[str, Any]] = None,
         callback_progreso: Optional[Callable[[int, str, str], None]] = None
     ) -> Dict[str, Any]:
         """
         Analiza el video completo de partida larga, localiza los momentos cumbre con mayor impacto
         (gritos/emoción + acción visual), y genera múltiples Shorts independientes con subtítulos
-        incrustados por Whisper y opción de encuadre vertical 9:16.
+        incrustados por Whisper, carteles meme dinámicos, punch-in zoom dramático en el clímax,
+        pista de música gamer y opción de encuadre vertical 9:16.
 
         Args:
             ruta_video_entrada: Video fuente largo (ej. partida de 20-40 min).
@@ -211,6 +216,9 @@ class DirectorMontaje:
             duracion_short_segundos: Duración aproximada de cada short (ej. 30 a 50s).
             formato_vertical: True para exportar en lienzo 9:16 con fondo blur para TikTok/Shorts.
             incluir_subtitulos: Si es True, transcribe con Faster-Whisper e incrusta subtítulos.
+            incluir_musica_fondo: Si es True, mezcla una pista de música gamer en bucle de fondo.
+            incluir_zooms_impacto: Si es True, aplica punch-in zoom en el momento del clímax.
+            incluir_efectos_memes: Si es True, inserta sonido boom y carteles meme emergentes.
             ajustes_personalizados: Parámetros opcionales para afinar umbrales.
             callback_progreso: Función (porcentaje, etapa, mensaje) para actualizar estado en vivo.
 
@@ -288,6 +296,8 @@ class DirectorMontaje:
                 inicio_corte = momento["inicio"]
                 duracion_corte = momento["duracion"]
                 fin_corte = momento["fin"]
+                tiempo_cumbre_global = momento.get("tiempo_cumbre", (inicio_corte + fin_corte) / 2.0)
+                tiempo_climax_relativo = max(1.0, min(duracion_corte - 1.0, tiempo_cumbre_global - inicio_corte))
 
                 porcentaje_base = 60 + int((idx - 1) / total_momentos * 35)
                 reportar(
@@ -298,14 +308,26 @@ class DirectorMontaje:
 
                 ruta_ass_short = None
 
+                # Selección de cartel / meme gaming para este short
+                texto_meme = None
+                if incluir_efectos_memes:
+                    textos_memes_gaming = [
+                        "🔥 ¡OUTPLAYED! 🔥",
+                        "⚡ ¡JUGADÓN! ⚡",
+                        "💀 ELIMINADO 💀",
+                        "🎯 ¡BOOM! CLUTCH 🎯",
+                        "👑 GOD MODE ACTIVADO 👑",
+                        "💥 PENTAKILL VIBES 💥"
+                    ]
+                    texto_meme = textos_memes_gaming[(idx - 1) % len(textos_memes_gaming)]
+
                 # Si los subtítulos están habilitados, transcribir el audio específico de este clip
                 if transcriptor is not None:
                     reportar(
-                        porcentaje_base + 2,
+                        porcentaje_base + 1,
                         "whisper",
                         f"Transcribiendo diálogo y generando subtítulos animados para Short #{idx}..."
                     )
-                    # Cortar el audio en memoria directamente
                     indice_muestra_inicio = int(inicio_corte * tasa_muestreo)
                     indice_muestra_fin = int(fin_corte * tasa_muestreo)
                     trozo_audio = datos_audio[indice_muestra_inicio:indice_muestra_fin]
@@ -328,12 +350,52 @@ class DirectorMontaje:
                             ruta_salida_ass=str(ruta_ass),
                             color_primario_hex="#FFEA00",
                             color_borde_hex="#000000",
-                            formato_vertical=formato_vertical
+                            formato_vertical=formato_vertical,
+                            texto_sticker_climax=texto_meme,
+                            tiempo_climax_segundos=tiempo_climax_relativo
                         )
                         ruta_ass_short = str(ruta_ass)
                     except Exception as error_sub:
-                        reportar(porcentaje_base + 3, "whisper", f"Aviso al transcribir Short #{idx}: {error_sub}")
+                        reportar(porcentaje_base + 2, "whisper", f"Aviso al transcribir Short #{idx}: {error_sub}")
                         ruta_ass_short = None
+                elif incluir_efectos_memes and texto_meme:
+                    # Si no hay transcripción por voz pero están habilitados los memes, generar el cartel animado en el clímax
+                    ruta_ass = dir_salida / f"subtitulos_short_{idx}.ass"
+                    archivos_temporales.append(ruta_ass)
+                    generar_subtitulos_ass_animados(
+                        segmentos_transcripcion=[],
+                        ruta_salida_ass=str(ruta_ass),
+                        color_primario_hex="#FFEA00",
+                        color_borde_hex="#000000",
+                        formato_vertical=formato_vertical,
+                        texto_sticker_climax=texto_meme,
+                        tiempo_climax_segundos=tiempo_climax_relativo
+                    )
+                    ruta_ass_short = str(ruta_ass)
+
+                # Mezclar pista de audio personalizada (juego + música gamer + SFX boom de impacto)
+                ruta_audio_mezclado_short = None
+                if incluir_musica_fondo or (incluir_efectos_memes and tiempo_climax_relativo is not None):
+                    try:
+                        indice_muestra_inicio = int(inicio_corte * tasa_muestreo)
+                        indice_muestra_fin = int(fin_corte * tasa_muestreo)
+                        trozo_audio = datos_audio[indice_muestra_inicio:indice_muestra_fin]
+
+                        ruta_wav_mezcla = dir_salida / f"temp_mezcla_short_{idx}.wav"
+                        archivos_temporales.append(ruta_wav_mezcla)
+
+                        mezclar_audio_clip(
+                            datos_audio_original=trozo_audio,
+                            tasa_muestreo=tasa_muestreo,
+                            tiempo_climax_relativo=tiempo_climax_relativo,
+                            incluir_musica_fondo=incluir_musica_fondo,
+                            incluir_sfx_climax=incluir_efectos_memes,
+                            ruta_salida_wav=str(ruta_wav_mezcla)
+                        )
+                        ruta_audio_mezclado_short = str(ruta_wav_mezcla)
+                    except Exception as error_mezcla:
+                        reportar(porcentaje_base + 2, "audio", f"Aviso al mezclar audio para Short #{idx}: {error_mezcla}")
+                        ruta_audio_mezclado_short = None
 
                 # Renderizar el archivo final de este short
                 nombre_archivo_short = f"short_{idx}_min_{int(inicio_corte // 60):02d}_{int(inicio_corte % 60):02d}.mp4"
@@ -345,7 +407,10 @@ class DirectorMontaje:
                     duracion=duracion_corte,
                     ruta_salida=str(ruta_mp4_short),
                     ruta_subtitulos_ass=ruta_ass_short,
-                    formato_vertical=formato_vertical
+                    formato_vertical=formato_vertical,
+                    tiempo_climax_relativo=tiempo_climax_relativo,
+                    incluir_zoom_impacto=incluir_zooms_impacto,
+                    ruta_audio_mezclado=ruta_audio_mezclado_short
                 )
 
                 minutos = int(inicio_corte // 60)

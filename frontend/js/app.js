@@ -27,6 +27,8 @@ const estadoApp = {
     duracionSilencioSeg: 0.35,
     zoomsDinamicos: true,
     subtitulosIa: true,
+    memesSfx: true,
+    musicaGaming: true,
     audioDucking: true,
     aceleracionGpu: true
   }
@@ -62,6 +64,8 @@ const elementos = {
   sliderDuracion: document.getElementById('slider-duracion-silencio'),
   valorDuracion: document.getElementById('valor-duracion-silencio'),
   checkZooms: document.getElementById('check-zooms-dinamicos'),
+  checkMemesSfx: document.getElementById('check-memes-sfx'),
+  checkMusicaGaming: document.getElementById('check-musica-gaming'),
   checkSubtitulos: document.getElementById('check-subtitulos-ia'),
   checkDucking: document.getElementById('check-audio-ducking'),
   checkGpu: document.getElementById('check-aceleracion-gpu'),
@@ -342,6 +346,27 @@ function configurarEventosAjustes() {
     agregarLogConsola(`Subtítulos dinámicos de IA: ${e.target.checked ? 'Activados' : 'Desactivados'}`);
   });
 
+  if (elementos.checkZooms) {
+    elementos.checkZooms.addEventListener('change', (e) => {
+      estadoApp.ajustes.zoomsDinamicos = e.target.checked;
+      agregarLogConsola(`Punch-in Zoom dinámico: ${e.target.checked ? 'Activado' : 'Desactivado'}`);
+    });
+  }
+
+  if (elementos.checkMemesSfx) {
+    elementos.checkMemesSfx.addEventListener('change', (e) => {
+      estadoApp.ajustes.memesSfx = e.target.checked;
+      agregarLogConsola(`Carteles Meme y SFX Boom: ${e.target.checked ? 'Activados' : 'Desactivados'}`);
+    });
+  }
+
+  if (elementos.checkMusicaGaming) {
+    elementos.checkMusicaGaming.addEventListener('change', (e) => {
+      estadoApp.ajustes.musicaGaming = e.target.checked;
+      agregarLogConsola(`Música de fondo Gamer: ${e.target.checked ? 'Activada' : 'Desactivada'}`);
+    });
+  }
+
   elementos.botonRestablecer.addEventListener('click', () => {
     aplicarValoresPredeterminadosPlantilla(estadoApp.idPlantillaSeleccionada);
     agregarLogConsola('Ajustes restablecidos a los valores predeterminados del perfil.');
@@ -407,6 +432,9 @@ async function iniciarFlujoEdicion() {
         duracionShortSeg: estadoApp.duracionShortSeg,
         formatoVertical: estadoApp.formatoVertical,
         incluirSubtitulos: estadoApp.ajustes.subtitulosIa,
+        incluirMusicaFondo: estadoApp.ajustes.musicaGaming,
+        incluirZoomsImpacto: estadoApp.ajustes.zoomsDinamicos,
+        incluirEfectosMemes: estadoApp.ajustes.memesSfx,
         ajustes: {
           ajustes_audio: {
             umbral_silencio_db: estadoApp.ajustes.umbralSilencioDb,

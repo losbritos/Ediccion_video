@@ -71,6 +71,9 @@ class SolicitudProcesamiento(BaseModel):
     duracion_short_seg: float = 35.0
     formato_vertical: bool = True
     incluir_subtitulos: bool = True
+    incluir_musica_fondo: bool = True
+    incluir_zooms_impacto: bool = True
+    incluir_efectos_memes: bool = True
     ajustes: Optional[Dict[str, Any]] = None
 
 
@@ -137,11 +140,14 @@ def tarea_segundo_plano_procesar(
     duracion_short_seg: float,
     formato_vertical: bool,
     incluir_subtitulos: bool,
+    incluir_musica_fondo: bool,
+    incluir_zooms_impacto: bool,
+    incluir_efectos_memes: bool,
     ajustes: Optional[Dict[str, Any]]
 ) -> None:
     """
     Worker que ejecuta el ciclo de análisis y renderizado en segundo plano sin bloquear el servidor.
-    Soporta tanto el modo de generación de múltiples Shorts como el modo de video completo.
+    Soporta tanto el modo de generación de múltiples Shorts con efectos gamer como el modo de video completo.
     """
     registro_tareas[id_tarea]["estado"] = "en_proceso"
     info_video = registro_videos.get(id_video)
@@ -169,6 +175,9 @@ def tarea_segundo_plano_procesar(
                 duracion_short_segundos=duracion_short_seg,
                 formato_vertical=formato_vertical,
                 incluir_subtitulos=incluir_subtitulos,
+                incluir_musica_fondo=incluir_musica_fondo,
+                incluir_zooms_impacto=incluir_zooms_impacto,
+                incluir_efectos_memes=incluir_efectos_memes,
                 ajustes_personalizados=ajustes,
                 callback_progreso=notificar_progreso
             )
@@ -240,6 +249,9 @@ def iniciar_procesamiento_automatico(
         solicitud.duracion_short_seg,
         solicitud.formato_vertical,
         solicitud.incluir_subtitulos,
+        solicitud.incluir_musica_fondo,
+        solicitud.incluir_zooms_impacto,
+        solicitud.incluir_efectos_memes,
         solicitud.ajustes
     )
 

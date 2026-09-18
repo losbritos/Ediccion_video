@@ -149,3 +149,32 @@ Este documento es la guía de trabajo paso a paso del proyecto. Cada subtarea es
   - Script de arranque con un solo clic creado: `iniciar_app.bat`.
   - Abre automáticamente el navegador y arranca el backend de FastAPI.
   - *Criterio de verificación:* Archivo ejecutable probado y listo para su uso. (Completado).
+
+---
+
+## 🎮 Fase 7: Detección Inteligente de Gameplay sin Micrófono, Filtros Anti-Muerte y Edición Gamer Dinámica
+
+- [x] **Subtarea 7.1: Filtro Anti-Muerte y Anti-Pantallas Inactivas para LoL y Juegos**
+  - Análisis cromático en espacio HSV (`saturacion_media < 28.0`) en `analizador_video.py` para descartar automáticamente pantallas de muerte en blanco y negro / respawn.
+  - Anulación de puntuación de atención (`score = 0.0`) en tramos donde el jugador está muerto o en base esperando reaparición.
+  - *Criterio de verificación:* Test unitario `test_filtro_pantalla_muerte_lol_atencion_cero` en `test_shorts.py` validado con éxito.
+
+- [x] **Subtarea 7.2: Filtro Anti-Paneo de Cámara vs Combate Real**
+  - Diferenciación entre movimiento uniforme de cámara con ratón (>85% área sin destellos) y peleas reales en equipo (*teamfights*) con partículas y destellos de habilidades (`destello_combate`).
+  - *Criterio de verificación:* Test unitario `test_filtro_paneo_camara_lol_penalizacion` validado con éxito.
+
+- [x] **Subtarea 7.3: Distribución Temporal de Momentos Cumbre en Toda la Partida**
+  - División de la partida en $N$ fases temporales en `agrupar_momentos_cumbre()` para garantizar que los Shorts cubran el juego temprano, medio y tardío, y no queden concentrados en los primeros minutos.
+  - *Criterio de verificación:* Test unitario `test_agrupar_momentos_cumbre_selecciona_mejores_picos_sin_solapamiento` superado.
+
+- [x] **Subtarea 7.4: Efectos de Punch-in Zoom (1.25x) y Stickers Meme Animados**
+  - Implementación de zoom dramático centrado en el clímax de la jugada (`tiempo_climax_relativo`) en `motor_edicion.py` vía FFmpeg crop & scale dinámico.
+  - Generación de carteles meme animados en formato ASS (`GamingMeme` con animación pop-up `\fscx140\fscy140`) incluso en videos sin locución.
+  - *Criterio de verificación:* Tests `test_generar_subtitulos_con_sticker_meme_gaming` y `test_renderizar_short_con_zoom_impacto_y_audio_mezclado` superados.
+
+- [x] **Subtarea 7.5: Generador de Recursos Multimedia Locales y Mezcla de Audio Gamer**
+  - Creación de `generador_assets.py` con sintetizador local de sonido de impacto sub-bass boom, efecto whoosh y pista musical Synthwave (125 BPM en bucle).
+  - Mezcla automática de audio en memoria con atenuación y prevención de saturación digital en `mezclar_audio_clip()`.
+  - Controles e interruptores dinámicos en la interfaz web (`index.html`, `app.js`, `api.js`).
+  - *Criterio de verificación:* Test `test_mezclar_audio_clip_gamer` y 36/36 tests en suite global ejecutados exitosamente.
+

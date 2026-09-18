@@ -107,6 +107,9 @@ export async function iniciarProcesamiento(opciones) {
     duracion_short_seg: opciones.duracionShortSeg || 35.0,
     formato_vertical: opciones.formatoVertical !== undefined ? opciones.formatoVertical : true,
     incluir_subtitulos: opciones.incluirSubtitulos !== undefined ? opciones.incluirSubtitulos : true,
+    incluir_musica_fondo: opciones.incluirMusicaFondo !== undefined ? opciones.incluirMusicaFondo : true,
+    incluir_zooms_impacto: opciones.incluirZoomsImpacto !== undefined ? opciones.incluirZoomsImpacto : true,
+    incluir_efectos_memes: opciones.incluirEfectosMemes !== undefined ? opciones.incluirEfectosMemes : true,
     ajustes: opciones.ajustes || null
   };
 

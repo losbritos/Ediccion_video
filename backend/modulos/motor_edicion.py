@@ -278,11 +278,15 @@ def renderizar_short_con_subtitulos(
     duracion: float,
     ruta_salida: str,
     ruta_subtitulos_ass: Optional[str] = None,
-    formato_vertical: bool = False
+    formato_vertical: bool = False,
+    tiempo_climax_relativo: Optional[float] = None,
+    incluir_zoom_impacto: bool = False,
+    ruta_audio_mezclado: Optional[str] = None
 ) -> str:
     """
     Renderiza un clip independiente (Short) a partir de una marca de tiempo del video original,
-    con opción de subtítulos dinámicos incrustados y formato vertical 9:16 (fondo desenfocado + acción centrada).
+    con opción de subtítulos dinámicos incrustados, formato vertical 9:16 (fondo desenfocado + acción centrada),
+    efecto de zoom de impacto (punch-in zoom) en el clímax y pista de audio mezclada con música gamer y SFX.
 
     Args:
         ruta_video_origen: Archivo de video fuente.
@@ -291,6 +295,9 @@ def renderizar_short_con_subtitulos(
         ruta_salida: Archivo destino MP4 generado.
         ruta_subtitulos_ass: Ruta opcional a los subtítulos .ass que se quemarán (hardsub).
         formato_vertical: Si es True, renderiza en lienzo 9:16 (1080x1920) ideal para TikTok y Shorts.
+        tiempo_climax_relativo: Segundo dentro del clip donde ocurre la jugada clave para centrar el zoom.
+        incluir_zoom_impacto: Si es True, realiza un punch-in zoom dramático de 1.25x en el clímax.
+        ruta_audio_mezclado: Ruta a pista WAV personalizada (juego + música gamer + SFX de impacto).
 
     Returns:
         Ruta absoluta al Short generado.
@@ -315,6 +322,8 @@ def renderizar_short_con_subtitulos(
     tiene_subtitulos = bool(ruta_subtitulos_ass and Path(ruta_subtitulos_ass).exists())
     sub_escapada = escapar_ruta_filtro_ffmpeg(ruta_subtitulos_ass) if tiene_subtitulos else ""
 
+    tiene_audio_mezclado = bool(ruta_audio_mezclado and Path(ruta_audio_mezclado).exists())
+
     comando_base = [
         ejecutable, "-y",
         "-ss", f"{tiempo_inicio_seg:.3f}",
@@ -322,14 +331,36 @@ def renderizar_short_con_subtitulos(
         "-i", str(archivo_origen)
     ]
 
+    if tiene_audio_mezclado:
+        comando_base.extend(["-i", str(Path(ruta_audio_mezclado).resolve())])
+
+    # Configurar expresión de punch-in zoom dramático (1.25x por ~2 segundos)
+    aplicar_zoom = incluir_zoom_impacto and (tiempo_climax_relativo is not None)
+    if aplicar_zoom:
+        t_zoom_ini = max(0.0, float(tiempo_climax_relativo) - 0.2)
+        t_zoom_fin = float(tiempo_climax_relativo) + 1.8
+        filtro_crop_zoom = (
+            f"crop=w='if(between(t,{t_zoom_ini:.2f},{t_zoom_fin:.2f}),in_w*0.80,in_w)':"
+            f"h='if(between(t,{t_zoom_ini:.2f},{t_zoom_fin:.2f}),in_h*0.80,in_h)'"
+        )
+    else:
+        filtro_crop_zoom = ""
+
+    mapa_audio = ["-map", "1:a"] if tiene_audio_mezclado else ["-map", "0:a?"]
+
     if formato_vertical:
         # Lienzo vertical 9:16 (1080x1920)
-        # Capa fondo: reescalado a 1080x1920 recortado con desenfoque gaussiano/boxblur
-        # Capa frente: 1080 de ancho manteniendo aspecto nativo y centrada verticalmente
+        # Capa fondo: reescalado a 1080x1920 recortado con desenfoque de fondo
+        # Capa frente: 1080 de ancho con zoom de impacto opcional y centrada verticalmente
+        if aplicar_zoom:
+            transformacion_fg = f"[fg_in]{filtro_crop_zoom},scale=1080:-1[fg];"
+        else:
+            transformacion_fg = "[fg_in]scale=1080:-1[fg];"
+
         filtro_vertical = (
             "[0:v]split=2[bg_in][fg_in];"
             "[bg_in]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=20:20[bg];"
-            "[fg_in]scale=1080:-1[fg];"
+            f"{transformacion_fg}"
             "[bg][fg]overlay=(W-w)/2:(H-h)/2"
         )
         if tiene_subtitulos:
@@ -340,9 +371,9 @@ def renderizar_short_con_subtitulos(
         comando = list(comando_base)
         comando.extend([
             "-filter_complex", filtro_completo,
-            "-map", "[vout]",
-            "-map", "0:a?"
+            "-map", "[vout]"
         ])
+        comando.extend(mapa_audio)
         comando.extend(args_codec)
         comando.extend([
             "-c:a", "aac",
@@ -352,8 +383,20 @@ def renderizar_short_con_subtitulos(
     else:
         # Formato estándar panorámico (16:9)
         comando = list(comando_base)
+        filtros_vf = []
+        if aplicar_zoom:
+            filtros_vf.append(f"{filtro_crop_zoom},scale=1920:1080")
         if tiene_subtitulos:
-            comando.extend(["-vf", f"subtitles='{sub_escapada}'"])
+            filtros_vf.append(f"subtitles='{sub_escapada}'")
+
+        if filtros_vf:
+            comando.extend(["-vf", ",".join(filtros_vf)])
+
+        if tiene_audio_mezclado:
+            comando.extend(["-map", "0:v", "-map", "1:a"])
+        else:
+            comando.extend(["-map", "0:v?", "-map", "0:a?"])
+
         comando.extend(args_codec)
         comando.extend([
             "-c:a", "aac",

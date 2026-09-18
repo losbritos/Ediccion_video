@@ -4,7 +4,7 @@ Soporta exportación a formato estándar SubRip (.srt) y formato animado estilo 
 """
 
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 
 def formatear_tiempo_srt(segundos: float) -> str:
@@ -117,11 +117,15 @@ def generar_subtitulos_ass_animados(
     color_primario_hex: str = "#FFEA00",
     color_borde_hex: str = "#000000",
     tamano_fuente: int = 42,
-    formato_vertical: bool = False
+    formato_vertical: bool = False,
+    texto_sticker_climax: Optional[str] = None,
+    tiempo_climax_segundos: Optional[float] = None,
+    duracion_sticker_segundos: float = 2.4
 ) -> str:
     """
     Genera un archivo de subtítulos animados (.ass) con tipografía llamativa,
-    borde grueso y efecto de resaltado palabra por palabra para YouTube / Shorts / Gaming.
+    borde grueso, efecto de resaltado palabra por palabra para YouTube / Shorts / Gaming,
+    y soporte para stickers / memes animados emergentes en el clímax de la jugada.
 
     Args:
         segmentos_transcripcion: Lista de segmentos con marcas de palabras.
@@ -130,6 +134,9 @@ def generar_subtitulos_ass_animados(
         color_borde_hex: Color del contorno del texto en hexadecimal.
         tamano_fuente: Tamaño de fuente en puntos.
         formato_vertical: True para adaptar la resolución y márgenes a 9:16 (1080x1920).
+        texto_sticker_climax: Texto meme / cartel a mostrar en el momento cumbre (ej. '🔥 ¡OUTPLAYED! 🔥').
+        tiempo_climax_segundos: Segundo exacto del Short donde ocurre la kill o jugada clave.
+        duracion_sticker_segundos: Duración en pantalla del cartel animado.
 
     Returns:
         Ruta absoluta al archivo .ass generado.
@@ -145,6 +152,9 @@ def generar_subtitulos_ass_animados(
     tamano = 56 if formato_vertical and tamano_fuente == 42 else tamano_fuente
     margen_v = 480 if formato_vertical else 90
 
+    # Tamaño y estilo del sticker meme
+    tamano_meme = 72 if formato_vertical else 60
+
     # Cabecera estándar de archivo ASS con estilo moderno (fuente gruesa, sombra, alineación central)
     cabecera_ass = f"""[Script Info]
 ScriptType: v4.00+
@@ -155,6 +165,7 @@ ScaledBorderAndShadow: yes
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 Style: GamingSub,Arial Black,{tamano},{color_primario_ass},&H0000FFFF&,{color_borde_ass},&H80000000&,-1,0,0,0,100,100,0,0,1,4.5,2,2,40,40,{margen_v},1
+Style: GamingMeme,Arial Black,{tamano_meme},&H0000FFFF&,&H00FFFFFF&,&H00000000&,&H80000000&,-1,0,0,0,100,100,0,0,1,6.0,3,5,40,40,0,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -162,12 +173,11 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
     lineas_eventos: List[str] = []
 
+    # 1. Añadir subtítulos de locución
     for segmento in segmentos_transcripcion:
         palabras = segmento.get("palabras", [])
 
-        # Si el segmento contiene marcas por palabra, generar efecto dinámico
         if palabras:
-            # Dividir en grupos pequeños (3-5 palabras) para que queden centrados y dinámicos
             tamano_grupo = 4
             for i in range(0, len(palabras), tamano_grupo):
                 grupo_palabras = palabras[i : i + tamano_grupo]
@@ -177,19 +187,33 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 inicio_ass = formatear_tiempo_ass(t_inicio)
                 fin_ass = formatear_tiempo_ass(t_fin)
 
-                # Construir texto con animación de escala o resaltado
                 texto_grupo = " ".join(p["palabra"] for p in grupo_palabras)
-                # Efecto de pop-up inicial sutil
                 linea = f"Dialogue: 0,{inicio_ass},{fin_ass},GamingSub,,0,0,0,,{{\\t(0,80,\\fscx112\\fscy112)\\t(80,160,\\fscx100\\fscy100)}}{texto_grupo}"
                 lineas_eventos.append(linea)
         else:
-            # Subtítulo normal por segmento si no hay palabras individuales
             inicio_ass = formatear_tiempo_ass(segmento["inicio"])
             fin_ass = formatear_tiempo_ass(segmento["fin"])
             texto = segmento.get("texto", "").strip()
             if texto:
                 linea = f"Dialogue: 0,{inicio_ass},{fin_ass},GamingSub,,0,0,0,,{texto}"
                 lineas_eventos.append(linea)
+
+    # 2. Añadir sticker / meme animado emergente en el clímax
+    if texto_sticker_climax and tiempo_climax_segundos is not None:
+        t_ini_stk = max(0.0, tiempo_climax_segundos - 0.2)
+        t_fin_stk = t_ini_stk + duracion_sticker_segundos
+        stk_ini_str = formatear_tiempo_ass(t_ini_stk)
+        stk_fin_str = formatear_tiempo_ass(t_fin_stk)
+
+        # Ubicación central con pop-up explosivo
+        pos_y = 960 if formato_vertical else 540
+        pos_x = 540 if formato_vertical else 960
+
+        linea_stk = (
+            f"Dialogue: 1,{stk_ini_str},{stk_fin_str},GamingMeme,,0,0,0,,"
+            f"{{\\an5\\pos({pos_x},{pos_y})\\t(0,100,\\fscx140\\fscy140)\\t(100,240,\\fscx100\\fscy100)}}{texto_sticker_climax}"
+        )
+        lineas_eventos.append(linea_stk)
 
     with open(archivo_salida, "w", encoding="utf-8") as archivo:
         archivo.write(cabecera_ass + "\n".join(lineas_eventos) + "\n")
